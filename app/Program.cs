@@ -54,7 +54,7 @@ namespace Glassify
                 Opts.Load();
                 Window = new MainForm();
                 Mini.Init();
-                Bar.Sync();          // bar was on last time: bring it back
+                if (Opts.Bar && Opts.BarShown) Bar.Show();   // the bar was on screen last time: bring it back
                 StartHotkeys();
                 GameMode.Start();
                 System.Windows.Forms.Application.Run(Window);
@@ -139,7 +139,7 @@ namespace Glassify
     /// App options set from the settings panel, saved so they work before the page loads (start-up, game mode).
     static class Opts
     {
-        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarBottom = false;
+        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarBottom = false, BarShown = false;
         static string FilePath => Path.Combine(Program.Data, "opts.txt");
         public static void Load()
         {
@@ -156,11 +156,11 @@ namespace Glassify
         }
         static void Set(string k, bool v)
         {
-            switch (k) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barbottom": BarBottom = v; break; }
+            switch (k) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barbottom": BarBottom = v; break; case "barshown": BarShown = v; break; }
         }
         public static void Save()
         {
-            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbarbottom={B(BarBottom)}\r\n"); } catch { }
+            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbarbottom={B(BarBottom)}\r\nbarshown={B(BarShown)}\r\n"); } catch { }
         }
         static string B(bool b) => b ? "1" : "0";
         /// From the page: "opts:game=1,ghost=1,toast=0,auto=0,startmini=0"

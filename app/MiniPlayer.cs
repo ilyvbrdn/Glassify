@@ -50,15 +50,29 @@ namespace Glassify
             _disp.BeginInvoke(new Action(() => _win?.SetInterval(eco ? 3000 : 1000)));
         }
 
-        /// Show the mini player (no toggle): used when the main window is hidden to it.
+        // The mini player and the bar are one player in two shapes (Opts.Bar = bar shape). Show / hide / toggle
+        // act on whichever shape is current; Bar.Toggle (Ctrl+Alt+B) switches the shape.
+
+        /// Show the player (no toggle): used when the main window is hidden to it.
         public static void ShowOnly()
+        {
+            if (Opts.Bar) { Bar.Show(); return; }
+            ShowCard();
+        }
+        public static void ShowCard()
         {
             if (!_ready.Wait(3000) || _disp == null || _win == null) return;
             _disp.BeginInvoke(new Action(() => { try { if (!_win.IsVisible && !_win.Ghost) _win.ShowMini(); } catch (Exception ex) { Program.Log("mini show: " + ex); } }));
         }
+        public static void HideCard()
+        {
+            if (!_ready.Wait(3000) || _disp == null || _win == null) return;
+            _disp.BeginInvoke(new Action(() => { try { if (_win.Ghost) { _ghostManual = false; _win.SetGhost(false); } _win.Hide(); } catch { } }));
+        }
 
         public static void Toggle()
         {
+            if (Opts.Bar) { Bar.ToggleVisible(); return; }
             if (!_ready.Wait(3000) || _disp == null || _win == null) { Program.Log("mini toggle: not ready"); return; }
             _disp.BeginInvoke(new Action(() =>
             {
@@ -76,23 +90,30 @@ namespace Glassify
         /// The mini player's UI thread, shared by the bar (null until it's ready).
         public static Dispatcher Disp => _ready.Wait(5000) ? _disp : null;
 
-        public static volatile bool IsShown;
+        /// The card (mini player shape) is on screen.
+        public static volatile bool CardShown;
+        /// The player is on screen in either shape.
+        public static bool IsShown => CardShown || Bar.IsShown;
         public static void HideOnly()
         {
+            Bar.Hide();
             if (!_ready.Wait(3000) || _disp == null || _win == null) return;
             _disp.BeginInvoke(new Action(() => { try { if (_win.Ghost) _win.SetGhost(false); _win.Hide(); } catch { } }));
         }
 
         // ---- ghost: semi-transparent and click-through, so it never blocks a click in your game ----
+        // (card shape only: the bar steps aside for fullscreen games by itself)
         static bool _ghostManual;
         public static void SetGhost(bool on, bool auto)
         {
+            if (on && Opts.Bar) return;
             if (!_ready.Wait(3000) || _disp == null || _win == null) return;
             if (auto && _ghostManual) return;        // you toggled it yourself with Ctrl+Alt+G: leave it be
             _disp.BeginInvoke(new Action(() => _win.SetGhost(on)));
         }
         public static void ToggleGhost()
         {
+            if (Opts.Bar) return;
             if (!_ready.Wait(3000) || _disp == null || _win == null) return;
             _disp.BeginInvoke(new Action(() =>
             {
@@ -328,7 +349,7 @@ namespace Glassify
                 await Task.Delay(600); await Refresh();
             }, "Like (save to Liked Songs)");
             extras.Children.Add(_like);
-            extras.Children.Add(IconButton("", 12, 28, () => Bar.Toggle(), "Switch to the bar (Ctrl+Alt+B)"));
+            extras.Children.Add(IconButton("", 12, 28, () => Bar.Toggle(), "Turn into the bar (Ctrl+Alt+B)"));
             extras.Children.Add(IconButton("", 12, 28, () => Program.FocusExisting(), "Open the main player"));
             Grid.SetRow(extras, 3);
 
@@ -366,7 +387,7 @@ namespace Glassify
                 SetWindowLong(hwnd, -20, GetWindowLong(hwnd, -20) | 0x80);
             };
             _timer.Tick += async (s, e) => await Refresh();
-            IsVisibleChanged += (s, e) => { Mini.IsShown = IsVisible; if (IsVisible) { _timer.Start(); _ = Refresh(); } else _timer.Stop(); };
+            IsVisibleChanged += (s, e) => { Mini.CardShown = IsVisible; if (IsVisible) { _timer.Start(); _ = Refresh(); } else _timer.Stop(); };
             _barFill.SizeChanged += (s, e) => { };
             _bar.SizeChanged += (s, e) => DrawBar();
         }

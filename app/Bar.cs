@@ -15,26 +15,39 @@ using System.Windows.Threading;
 
 namespace Glassify
 {
-    /// The bar: a thin glass player docked to the top or bottom edge of the main screen (gear menu > Bar, or
-    /// Ctrl+Alt+B). It registers with Windows like the taskbar does, so other windows make room for it instead of
-    /// sliding underneath, and it steps aside for fullscreen games. Its menu lists your library and searches songs.
+    /// The bar: the player's second shape (the first is the mini player card). A thin glass player docked to the top
+    /// or bottom edge of the main screen. It registers with Windows like the taskbar does, so other windows make room
+    /// for it, and it steps aside for fullscreen games. Shows next in queue and your recently played playlists, and its
+    /// menu lists your library and searches songs. Ctrl+Alt+B (or the shape buttons) turns one shape into the other.
     static class Bar
     {
         static BarWindow _w;
+        public static volatile bool IsShown;
 
-        /// Show or hide the bar to match the settings (and move it if top/bottom changed).
-        public static void Sync() => Run(w => { if (Opts.Bar) w.ShowBar(Opts.BarBottom); else w.HideBar(); });
+        public static void Show() => Run(w => w.ShowBar(Opts.BarBottom));
+        public static void Hide() => Run(w => w.HideBar());
+        public static void ToggleVisible() => Run(w => { if (w.IsVisible) w.HideBar(); else w.ShowBar(Opts.BarBottom); });
 
-        /// Ctrl+Alt+B / the mini player's bar button.
+        /// Ctrl+Alt+B / the shape buttons: turn the mini player into the bar, or back. The player stays on screen.
         public static void Toggle()
         {
             Opts.Bar = !Opts.Bar;
             Opts.Save();
             _ = Program.Eval("window.__msOpts && (window.__msOpts.bar = " + (Opts.Bar ? "true" : "false") + ")");
-            Sync();
+            if (Opts.Bar) { Mini.HideCard(); Show(); }
+            else { Hide(); Mini.ShowCard(); }
         }
 
-        public static void CloseNow() { try { _w?.HideBar(); _w?.Close(); } catch { } }
+        /// Settings changed (shape or top/bottom): if the player is on screen, show it in the chosen shape.
+        public static void Sync() => Run(w =>
+        {
+            if (Opts.Bar) { if (w.IsVisible || Mini.CardShown) { Mini.HideCard(); w.ShowBar(Opts.BarBottom); } }
+            else if (w.IsVisible) { w.HideBar(); Mini.ShowCard(); }
+        });
+
+        internal static void Remember(bool shown) { IsShown = shown; if (Opts.BarShown != shown) { Opts.BarShown = shown; Opts.Save(); } }
+
+        public static void CloseNow() { try { if (_w != null) { bool was = Opts.BarShown; _w.HideBar(); Opts.BarShown = was; Opts.Save(); _w.Close(); } } catch { } }
 
         static void Run(Action<BarWindow> a)
         {
@@ -59,6 +72,13 @@ namespace Glassify
         readonly Border _fill = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Background = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Width = 0 };
         readonly Grid _seek = new Grid { Height = 16, Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = "Click to jump", Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         readonly Grid _root;
+        readonly StackPanel _song, _recents;
+        readonly DockPanel _timeline;
+        readonly Border _nextBox;
+        readonly Image _nextArt = new Image { Stretch = Stretch.UniformToFill, Width = 30, Height = 30 };
+        readonly TextBlock _nextTitle = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly TextBlock _nextArtist = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0xA8, 255, 255, 255)), TextTrimming = TextTrimming.CharacterEllipsis };
+        string _nextFor, _nextImg; DateTime _recentAt; bool _hasNext;
         readonly Button _play, _like, _menuBtn;
         readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         string _artUrl; double _posS, _durS; bool _playing, _liked; DateTime _at = DateTime.UtcNow;
@@ -86,46 +106,35 @@ namespace Glassify
             WindowChrome.SetWindowChrome(this, new WindowChrome { GlassFrameThickness = new Thickness(-1), CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), UseAeroCaptionButtons = false });
 
             _root = new Grid { Background = new SolidColorBrush(Color.FromArgb(0x70, 0x20, 0x10, 0x1C)) };
-            var dock = new DockPanel { LastChildFill = true, Margin = new Thickness(8, 0, 8, 0) };
+            // [ menu | cover + song | controls | timeline (mini-player length) | next in queue ][ recent playlists... ][ buttons ]
+            var row = new Grid { Margin = new Thickness(8, 0, 8, 0) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var left = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-            // left: menu, cover, song
             _menuBtn = Btn("", 14, 36, ToggleMenu, "Your library and search");
-            DockPanel.SetDock(_menuBtn, Dock.Left); dock.Children.Add(_menuBtn);
+            left.Children.Add(_menuBtn);
             var artBox = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(6), Margin = new Thickness(6, 0, 10, 0), Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), Child = _art, Cursor = Cursors.Hand, ToolTip = "Open Glassify", VerticalAlignment = VerticalAlignment.Center };
             _art.Clip = new RectangleGeometry(new Rect(0, 0, 34, 34), 6, 6);
             artBox.MouseLeftButtonUp += (s, e) => Program.FocusExisting();
-            DockPanel.SetDock(artBox, Dock.Left); dock.Children.Add(artBox);
-            var song = new StackPanel { Width = 260, VerticalAlignment = VerticalAlignment.Center };
+            left.Children.Add(artBox);
+            _song = new StackPanel { Width = 240, VerticalAlignment = VerticalAlignment.Center };
             _title.Text = "Glassify"; _artist.Text = "Nothing playing";
-            song.Children.Add(_title); song.Children.Add(_artist);
-            DockPanel.SetDock(song, Dock.Left); dock.Children.Add(song);
+            _song.Children.Add(_title); _song.Children.Add(_artist);
+            left.Children.Add(_song);
 
-            // controls
-            var ctl = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 6, 0) };
+            var ctl = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 4, 0) };
             ctl.Children.Add(Btn("", 13, 32, () => Click("control-button-skip-back"), "Previous"));
             _play = Btn("", 14, 34, () => { _playing = !_playing; UpdatePlay(); Click("control-button-playpause"); }, "Play/pause", true);
             ctl.Children.Add(_play);
             ctl.Children.Add(Btn("", 13, 32, () => Click("control-button-skip-forward"), "Next"));
-            DockPanel.SetDock(ctl, Dock.Left); dock.Children.Add(ctl);
+            left.Children.Add(ctl);
 
-            // right: like, mini player, open main, close
-            var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            _like = Btn("", 12, 30, async () =>
-            {
-                if (_liked) { Program.FocusExisting(); return; }
-                _liked = true; UpdateLike();
-                try { await Program.Eval("window.__ms && window.__ms.like()"); } catch { }
-                await Task.Delay(600); await Refresh();
-            }, "Like (save to Liked Songs)");
-            right.Children.Add(_like);
-            right.Children.Add(Btn("", 12, 30, () => Program.FocusExisting(), "Open the main player"));
-            right.Children.Add(Btn("", 11, 30, () => Bar.Toggle(), "Hide the bar (Ctrl+Alt+B)"));
-            DockPanel.SetDock(right, Dock.Right); dock.Children.Add(right);
-
-            // middle: time - progress - time (fills the rest)
-            var mid = new DockPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0) };
-            DockPanel.SetDock(_pos, Dock.Left); mid.Children.Add(_pos);
-            DockPanel.SetDock(_dur, Dock.Right); mid.Children.Add(_dur);
+            // timeline: about as long as the mini player's, not the whole screen
+            _timeline = new DockPanel { Width = 320, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 4, 0) };
+            DockPanel.SetDock(_pos, Dock.Left); _timeline.Children.Add(_pos);
+            DockPanel.SetDock(_dur, Dock.Right); _timeline.Children.Add(_dur);
             _seek.Children.Add(new Border { Height = 3, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(Color.FromArgb(0x38, 255, 255, 255)) });
             _seek.Children.Add(_fill);
             _seek.MouseLeftButtonDown += async (s, e) =>
@@ -135,13 +144,52 @@ namespace Glassify
                 try { await Program.Eval("window.__ms && window.__ms.seek(" + frac.ToString(CultureInfo.InvariantCulture) + ")"); } catch { }
                 await Task.Delay(400); await Refresh();
             };
-            mid.Children.Add(_seek);
-            dock.Children.Add(mid);
+            _timeline.Children.Add(_seek);
+            left.Children.Add(_timeline);
 
-            _root.Children.Add(dock);
+            // next in queue (click = skip to it)
+            var nextGrid = new Grid();
+            nextGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            nextGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            nextGrid.ColumnDefinitions.Add(new ColumnDefinition());
+            var nextLabel = new TextBlock { Text = "NEXT", FontSize = 9.5, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromArgb(0x90, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+            var nextArtBox = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), Child = _nextArt, VerticalAlignment = VerticalAlignment.Center };
+            _nextArt.Clip = new RectangleGeometry(new Rect(0, 0, 30, 30), 4, 4);
+            Grid.SetColumn(nextArtBox, 1);
+            var nextText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+            nextText.Children.Add(_nextTitle); nextText.Children.Add(_nextArtist);
+            Grid.SetColumn(nextText, 2);
+            nextGrid.Children.Add(nextLabel); nextGrid.Children.Add(nextArtBox); nextGrid.Children.Add(nextText);
+            _nextBox = new Border { Width = 250, Margin = new Thickness(14, 0, 0, 0), Padding = new Thickness(10, 5, 10, 5), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(0x14, 255, 255, 255)), Child = nextGrid, Cursor = Cursors.Hand, ToolTip = "Next in queue (click to skip to it)", VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+            _nextBox.MouseLeftButtonUp += (s, e) => Click("control-button-skip-forward");
+            left.Children.Add(_nextBox);
+            row.Children.Add(left);
+
+            // recently played: as many tiles as fit the screen
+            _recents = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(14, 0, 8, 0), ClipToBounds = true };
+            var recentHost = new Border { Child = _recents, ClipToBounds = true };
+            recentHost.SizeChanged += (s, e) => FitRecents();
+            Grid.SetColumn(recentHost, 1); row.Children.Add(recentHost);
+
+            // right: like, turn into the mini player, open Glassify, hide
+            var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _like = Btn("", 12, 30, async () =>
+            {
+                if (_liked) { Program.FocusExisting(); return; }
+                _liked = true; UpdateLike();
+                try { await Program.Eval("window.__ms && window.__ms.like()"); } catch { }
+                await Task.Delay(600); await Refresh();
+            }, "Like (save to Liked Songs)");
+            left.Children.Insert(left.Children.IndexOf(_timeline) + 1, _like);   // the heart sits right after the timeline
+            right.Children.Add(Btn("", 12, 30, () => Bar.Toggle(), "Turn into the mini player (Ctrl+Alt+B)"));
+            right.Children.Add(Btn("", 12, 30, () => Program.FocusExisting(), "Open the main player"));
+            right.Children.Add(Btn("", 11, 30, () => Bar.Hide(), "Hide the player (Ctrl+Alt+M brings it back)"));
+            Grid.SetColumn(right, 2); row.Children.Add(right);
+
+            _root.Children.Add(row);
             _root.MouseWheel += async (s, e) => { try { await Program.Eval("window.__ms && window.__ms.volume(" + (e.Delta > 0 ? "0.05" : "-0.05") + ")"); } catch { } };
+            SizeChanged += (s, e) => Adapt();
             Content = _root;
-
             // ---- the menu: search box, then your library or the search results ----
             var searchRow = new Grid { Height = 36, Margin = new Thickness(10, 10, 10, 2) };
             searchRow.Children.Add(new Border { CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)) });
@@ -185,15 +233,91 @@ namespace Glassify
             if (!IsVisible) { Show(); _timer.Start(); _ = Refresh(); }
             if (moved && _registered) Unregister();
             DockToEdge();
+            Bar.Remember(true);
+            if ((DateTime.UtcNow - _recentAt).TotalSeconds > 30) _ = UpdateRecents();
         }
 
         public void HideBar()
         {
             _popup.IsOpen = false;
+            Bar.Remember(false);
             if (!IsVisible) return;
             Unregister();
             _timer.Stop();
             Hide();
+        }
+
+        // ---------- fits any screen, from small laptops to ultra-wides ----------
+        // The essentials always fit; the timeline shortens on narrow screens; "next in queue" shows when there's
+        // room; the recently played tiles fill whatever space is left (a couple on a laptop, a dozen on an ultra-wide).
+        void Adapt()
+        {
+            double w = ActualWidth; if (w < 100) return;
+            _song.Width = w < 1000 ? 170 : 240;
+            _timeline.Width = w < 1000 ? 220 : 320;
+            _timeline.Visibility = w < 760 ? Visibility.Collapsed : Visibility.Visible;
+            _nextBox.Visibility = _hasNext && w >= 1180 ? Visibility.Visible : Visibility.Collapsed;
+            _nextBox.Width = w < 1500 ? 210 : 250;
+        }
+
+        const double TileW = 184;   // tile 178 + gap 6
+        void FitRecents()
+        {
+            if (_recents.Parent is FrameworkElement host)
+            {
+                int fit = (int)Math.Max(0, Math.Floor((host.ActualWidth - 22) / TileW));
+                for (int i = 0; i < _recents.Children.Count; i++) _recents.Children[i].Visibility = i < fit ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        async Task UpdateRecents()
+        {
+            _recentAt = DateTime.UtcNow;
+            var items = await Poll("window.__ms && __ms.recents()", "JSON.stringify(window.__msRecent || null)", 15000);
+            if (items == null) return;
+            _recents.Children.Clear();
+            foreach (var it in items)
+            {
+                var name = Program.Str(it, "name") ?? ""; var uri = Program.Str(it, "uri"); var img = Program.Str(it, "img");
+                if (string.IsNullOrEmpty(uri) || name.Length == 0) continue;
+                var g = new Grid();
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                g.ColumnDefinitions.Add(new ColumnDefinition());
+                var pic = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(5), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)) };
+                if (!string.IsNullOrEmpty(img) && img.StartsWith("https://"))
+                    try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(img); bi.DecodePixelWidth = 60; bi.EndInit(); pic.Child = new Image { Source = bi, Stretch = Stretch.UniformToFill, Clip = new RectangleGeometry(new Rect(0, 0, 30, 30), 5, 5) }; } catch { }
+                g.Children.Add(pic);
+                var label = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 4, 0) };
+                Grid.SetColumn(label, 1); g.Children.Add(label);
+                var tile = new Border { Width = 178, Height = 38, Margin = new Thickness(0, 0, 6, 0), Padding = new Thickness(4), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(0x14, 255, 255, 255)), Child = g, Cursor = Cursors.Hand, ToolTip = "Play " + name };
+                tile.MouseEnter += (s, e) => tile.Background = new SolidColorBrush(Color.FromArgb(0x2A, 255, 255, 255));
+                tile.MouseLeave += (s, e) => tile.Background = new SolidColorBrush(Color.FromArgb(0x14, 255, 255, 255));
+                tile.MouseLeftButtonUp += async (s, e) =>
+                {
+                    _title.Text = name; _artist.Text = "Starting...";
+                    await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(uri) + "," + Program.Json.Serialize(name) + ")");
+                    await Task.Delay(1500); await Refresh();
+                };
+                _recents.Children.Add(tile);
+            }
+            FitRecents();
+        }
+
+        async Task UpdateNext(string forTrack)
+        {
+            _nextFor = forTrack;
+            var items = await Poll("window.__ms && __ms.upNext()", "JSON.stringify(window.__msNext || null)", 8000);
+            if (_nextFor != forTrack || items == null) return;
+            if (items.Count == 0) { _hasNext = false; Adapt(); return; }
+            var n = items[0];
+            _nextTitle.Text = Program.Str(n, "name") ?? ""; _nextArtist.Text = Program.Str(n, "sub") ?? "";
+            var img = Program.Str(n, "img");
+            if (!string.IsNullOrEmpty(img) && img != _nextImg && img.StartsWith("https://"))
+            {
+                _nextImg = img;
+                try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(img); bi.DecodePixelWidth = 60; bi.EndInit(); _nextArt.Source = bi; } catch { }
+            }
+            _hasNext = _nextTitle.Text.Length > 0; Adapt();
         }
 
         void DockToEdge()
@@ -358,6 +482,10 @@ namespace Glassify
                 if (!string.IsNullOrEmpty(json) && Program.Json.DeserializeObject(json) is Dictionary<string, object> st)
                 {
                     var t = Program.Str(st, "t"); if (!string.IsNullOrEmpty(t)) { _title.Text = t; _artist.Text = Program.Str(st, "a"); }
+                    // new song: find out what's next (and refresh the recents now and then)
+                    var key = t + "|" + Program.Str(st, "a");
+                    if (!string.IsNullOrEmpty(t) && key != _nextFor) _ = UpdateNext(key);
+                    if ((DateTime.UtcNow - _recentAt).TotalMinutes > 3) _ = UpdateRecents();
                     _playing = st.TryGetValue("playing", out var p) && p is bool pb && pb; UpdatePlay();
                     _liked = st.TryGetValue("liked", out var lk) && lk is bool lb && lb; UpdateLike();
                     var art = Program.Str(st, "art");

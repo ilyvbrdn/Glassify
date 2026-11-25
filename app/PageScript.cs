@@ -46,6 +46,22 @@ html.ms-eco *, html.ms-eco *::before, html.ms-eco *::after { animation-play-stat
 html.ms-lite #main-view img, html.ms-lite #Desktop_LeftSidebar_Id img, html.ms-lite [data-testid=""card-image""],
 html.ms-lite [data-testid=""shortcut-image""], html.ms-lite video { display: none !important; }
 `;
+// The web player's own sign-in token, noticed as Spotify's page sends it with its requests, so the bar can ask
+// Spotify's player API for your queue and recently played (your own data, from your own signed-in session).
+if (!window.__msTok) {
+  window.__msTok = { v: '' };
+  const of = window.fetch;
+  window.fetch = function (input, init) {
+    try {
+      const h = init && init.headers; let a = null;
+      if (h) a = typeof h.get === 'function' ? h.get('authorization') : (h.Authorization || h.authorization);
+      if (!a && input && typeof input === 'object' && input.headers && typeof input.headers.get === 'function') a = input.headers.get('authorization');
+      if (a && a.indexOf('Bearer ') === 0) window.__msTok.v = a;
+    } catch (e) {}
+    return of.apply(this, arguments);
+  };
+  window.__msTok.fetch = of;
+}
 if (window.__ms) { window.__ms.cssText = CSS; try { window.__ms.apply(); } catch (e) {} return 'updated'; }
 const id='minispotify-theme';
 const q=s=>document.querySelector(s);
@@ -272,11 +288,11 @@ const ms = window.__ms = {
       '<label class=""ms-check""><input type=""checkbox"" data-o=""toast""><span><b>Song-change popup</b><br>A small popup with the cover when the song changes (when Glassify isn\'t in front)</span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""auto""><span><b>Start with Windows</b></span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
-      '<div class=""ms-h"">Bar</div>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Show the bar</b><br>A thin player docked to the edge of your screen, with your playlists and search (Ctrl+Alt+B)</span></label>' +
+      '<div class=""ms-h"">Player shape</div>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Bar shape</b><br>Turn the mini player into a bar docked to the edge of your screen, with next in queue, recent playlists and search (Ctrl+Alt+B switches)</span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""barbottom""><span><b>Bar at the bottom</b><br>Dock it to the bottom of the screen instead of the top</span></label>' +
       '<div class=""ms-h"">Shortcuts</div>' +
-      '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
+      '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;mini player &harr; bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
       '<div class=""ms-desc ms-ver""></div>' +
       '<div class=""ms-note""></div>' +
       '<div class=""ms-row""><button class=""ms-reset"">Reset</button><button class=""ms-done"">Done</button></div>';
@@ -511,6 +527,73 @@ const ms = window.__ms = {
     if (!r) return 'gone';
     r.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     return 'ok';
+  },
+
+  // ---- for the bar: next in queue, recently played ----
+  async api(path) {
+    const tok = (window.__msTok || {}).v; if (!tok) throw new Error('no token yet');
+    const r = await (window.__msTok.fetch || fetch).call(window, 'https://api.spotify.com/v1' + path, { headers: { Authorization: tok } });
+    if (!r.ok) throw new Error('api ' + r.status);
+    return r.status === 204 ? null : r.json();
+  },
+  pic(images, min) { const l = (images || []).filter(x => x && x.url).sort((a, b) => (a.width || 0) - (b.width || 0)); const p = l.find(x => (x.width || 0) >= (min || 64)) || l[l.length - 1]; return p ? p.url : ''; },
+  // next song: Spotify's queue; if that can't be read, the 'Next in queue' card of the Now Playing panel
+  upNext() {
+    window.__msNext = { state: 'busy' };
+    (async () => {
+      // 1. the 'Next in queue' card Spotify keeps in its Now Playing panel (there even while the panel is folded away)
+      let next = null;
+      const label = [...document.querySelectorAll('aside *')].find(e => e.children.length === 0 && /^Next in queue$/i.test((e.textContent || '').trim()));
+      if (label) {
+        let box = label; for (let k = 0; k < 6 && box.parentElement; k++) { box = box.parentElement; if (box.querySelector('img')) break; }
+        const artists = [...box.querySelectorAll('a[href^=""/artist/""]')].map(a => a.textContent.trim()).filter(Boolean);
+        const skip = new Set(['next in queue', 'open queue', 'e', ...artists.map(x => x.toLowerCase())]);
+        const leaves = [...box.querySelectorAll('*')].filter(e => e.children.length === 0).map(e => (e.textContent || '').trim()).filter(x => x && !skip.has(x.toLowerCase()) && x !== ',');
+        const img = box.querySelector('img');
+        if (leaves.length) next = { name: leaves[0], sub: artists.join(', '), img: img ? (img.currentSrc || img.src || '') : '' };
+      }
+      // 2. otherwise ask Spotify's player for the queue
+      if (!next) try {
+        const q = await this.api('/me/player/queue');
+        const t = q && q.queue && q.queue[0];
+        if (t) next = { name: t.name, sub: (t.artists || (t.show ? [t.show] : [])).map(a => a.name).join(', '), img: this.pic((t.album || t).images, 64) };
+      } catch (e) {}
+      window.__msNext = { state: 'done', items: next ? [next] : [] };
+    })().catch(e => { window.__msNext = { state: 'error', error: String(e) }; });
+    return 'started';
+  },  // recently played playlists/albums/artists: Spotify's play history; if that can't be read, your library list
+  // (which Spotify sorts by Recents by default)
+  recents() {
+    window.__msRecent = { state: 'busy' };
+    (async () => {
+      const side = new Map();
+      document.querySelectorAll('#Desktop_LeftSidebar_Id [role=row]').forEach(r => {
+        const t = r.querySelector('[id^=""listrow-title-""]'); if (!t) return;
+        const uri = t.id.replace('listrow-title-', ''); const img = r.querySelector('img');
+        if (/^spotify:(playlist|album|artist|show|collection)/.test(uri)) side.set(uri, { uri, name: t.textContent.trim(), img: img ? (img.currentSrc || img.src || '') : '' });
+      });
+      let items = [];
+      try {
+        const h = await this.api('/me/player/recently-played?limit=50');
+        const seen = new Set();
+        for (const it of (h && h.items) || []) {
+          let uri = it.context && it.context.uri; if (!uri) continue;
+          if (/:collection$/.test(uri)) uri = 'spotify:collection:tracks';
+          if (seen.has(uri) || !/^spotify:(playlist|album|artist|show|collection)/.test(uri)) continue;
+          seen.add(uri);
+          let e = side.get(uri);
+          if (!e) {
+            const m = /^spotify:(playlist|album|artist|show):(\w+)$/.exec(uri);
+            if (m) try { const d = await this.api('/' + m[1] + 's/' + m[2] + (m[1] === 'playlist' ? '?fields=name,images' : '')); e = { uri, name: d.name, img: this.pic(d.images, 64) }; } catch (x) {}
+          }
+          if (e) items.push(e);
+          if (items.length >= 16) break;
+        }
+      } catch (e) {}
+      if (!items.length) items = [...side.values()].slice(0, 16);
+      window.__msRecent = { state: 'done', items };
+    })().catch(e => { window.__msRecent = { state: 'error', error: String(e) }; });
+    return 'started';
   }
 };
 // The script can run before the page exists, so every step is guarded and the upkeep timer is always set.
