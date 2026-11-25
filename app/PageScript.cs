@@ -381,7 +381,12 @@ const ms = window.__ms = {
   seek(frac) { return this.setRange('[data-testid=""playback-progressbar""] input[type=range]', (v, min, max) => min + frac * (max - min)); },
   volume(d) { return this.setRange('[data-testid=""volume-bar""] input[type=range]', (v, min, max) => v + d * (max - min)); },
   // the save/like button next to the song in the player bar ('Add to Liked Songs', or 'Add to playlist' once liked)
-  likeButton() { return [...document.querySelectorAll('[data-testid=""now-playing-bar""] button[aria-checked]')].find(b => /liked songs|playlist/i.test(b.getAttribute('aria-label') || '') && !/shuffle|repeat/i.test(b.getAttribute('aria-label') || '')); },
+  likeButton() {
+    const bs = [...document.querySelectorAll('[data-testid=""now-playing-bar""] button')], label = b => b.getAttribute('aria-label') || '';
+    // the usual heart (Add to / Saved in Liked Songs); for Smart Shuffle recommendations Spotify shows 'Add to <playlist>' instead
+    return bs.find(b => b.hasAttribute('aria-checked') && /liked songs|playlist/i.test(label(b)) && !/shuffle|repeat/i.test(label(b)))
+        || bs.find(b => /^add to /i.test(label(b)) && !/shuffle|repeat|queue/i.test(label(b)));
+  },
   liked() { const b = this.likeButton(); return !!b && b.getAttribute('aria-checked') === 'true'; },
   // saves the current song to Liked Songs (never un-likes by accident: Spotify's own button opens a menu when already liked)
   like() { const b = this.likeButton(); if (!b) return 'missing'; if (!this.liked()) b.click(); return 'ok'; },
@@ -447,32 +452,50 @@ const ms = window.__ms = {
 
   // ---- for the bar's menu: your library, search, and playing what you pick ----
   // Results land in window.__msLib / window.__msFind ({state:'busy'|'done'|'error', items}); Glassify polls them.
-  wait(ms) { return new Promise(r => setTimeout(r, ms)); },
+  // Small step-by-step jobs. When Glassify's window is hidden, Chrome slows a hidden page's timers to as little as
+  // once a minute, so these never sleep on a timer: each pump() runs one step of every job. Glassify calls pump()
+  // from outside (not slowed down) while it waits for a result; the page's own timer only helps while it's visible.
+  jobs: [],
+  job(tag, step, ms) {
+    this.jobs = this.jobs.filter(j => j.tag !== tag);
+    this.jobs.push({ tag, step, until: Date.now() + ms });
+    if (!this._pumping) { this._pumping = true; const loop = () => { if (this.pump()) setTimeout(loop, 120); else this._pumping = false; }; setTimeout(loop, 120); }
+    this.pump();
+  },
+  pump() {
+    const now = Date.now();
+    this.jobs = this.jobs.filter(j => { let done; try { done = j.step(now >= j.until); } catch (e) { done = true; } return !done && now < j.until; });
+    return this.jobs.length;
+  },
   go(path) { if (location.pathname !== path) { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); } },
-  // Your Library list (playlists, albums, artists, Liked Songs). The list only draws the rows on screen, so scroll
-  // through it once to collect every entry, then put the scroll position back.
+  // Your Library list (playlists, albums, artists, Liked Songs). The list only draws the rows on screen, so (while
+  // the window is visible) scroll through it once to collect every entry, then put the scroll position back.
   library() {
-    if (this._libBusy) return 'busy';
-    this._libBusy = true; window.__msLib = { state: 'busy' };
-    (async () => {
-      const out = new Map();
-      const grab = () => document.querySelectorAll('#Desktop_LeftSidebar_Id [role=row]').forEach(r => {
-        const t = r.querySelector('[id^=""listrow-title-""]'); if (!t) return;
-        const uri = t.id.replace('listrow-title-', '');
-        if (out.has(uri) || !/^spotify:(playlist|album|artist|show|collection)/.test(uri)) return;
-        const sub = r.querySelector('[id^=""listrow-subtitle-""]'), img = r.querySelector('img');
-        out.set(uri, { uri, name: t.textContent.trim(), sub: sub ? sub.textContent.trim() : '', img: img ? (img.currentSrc || img.src || '') : '' });
-      });
-      grab();
-      let sc = document.querySelector('#Desktop_LeftSidebar_Id [role=row]');
-      while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
-      if (sc) {
-        const keep = sc.scrollTop;
-        for (let y = 0, n = 0; y < sc.scrollHeight && n < 60; y += Math.max(200, sc.clientHeight * 0.8), n++) { sc.scrollTop = y; await this.wait(120); grab(); }
-        sc.scrollTop = keep;
-      }
-      window.__msLib = { state: 'done', items: [...out.values()] };
-    })().catch(e => { window.__msLib = { state: 'error', error: String(e) }; }).finally(() => { this._libBusy = false; });
+    window.__msLib = { state: 'busy' };
+    const out = new Map();
+    const grab = () => document.querySelectorAll('#Desktop_LeftSidebar_Id [role=row]').forEach(r => {
+      const t = r.querySelector('[id^=""listrow-title-""]'); if (!t) return;
+      const uri = t.id.replace('listrow-title-', '');
+      if (out.has(uri) || !/^spotify:(playlist|album|artist|show|collection)/.test(uri)) return;
+      const sub = r.querySelector('[id^=""listrow-subtitle-""]'), img = r.querySelector('img');
+      out.set(uri, { uri, name: t.textContent.trim(), sub: sub ? sub.textContent.trim() : '', img: img ? (img.currentSrc || img.src || '') : '' });
+    });
+    const finish = () => { window.__msLib = { state: 'done', items: [...out.values()] }; };
+    grab();
+    let sc = document.querySelector('#Desktop_LeftSidebar_Id [role=row]');
+    while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+    // hidden page: the list can't redraw while scrolled, so take what's drawn (your most recent ~25)
+    if (!sc || document.hidden) { finish(); return 'done'; }
+    const keep = sc.scrollTop; let y = 0, n = 0, last = 0;
+    sc.scrollTop = 0;
+    this.job('lib', expired => {
+      if (expired) { sc.scrollTop = keep; finish(); return true; }
+      if (Date.now() - last < 110) return false;
+      last = Date.now(); grab();
+      y += Math.max(200, sc.clientHeight * 0.8); n++;
+      if (y >= sc.scrollHeight || n > 60) { grab(); sc.scrollTop = keep; finish(); return true; }
+      sc.scrollTop = y; return false;
+    }, 15000);
     return 'started';
   },
   // Play something from your library: open its page and press its play button (the one named after it).
@@ -480,38 +503,31 @@ const ms = window.__ms = {
     const m = /^spotify:(playlist|album|artist|show):([A-Za-z0-9]+)$/.exec(uri || '');
     const path = uri === 'spotify:collection:tracks' ? '/collection/tracks' : m ? '/' + m[1] + '/' + m[2] : null;
     if (!path) return 'unsupported';
-    const id = this._playId = (this._playId || 0) + 1;
-    (async () => {
-      this.go(path);
-      const want = (name || '').toLowerCase();
-      for (let i = 0; i < 50 && this._playId === id; i++) {
-        await this.wait(150);
-        const b = document.querySelector('#main-view [data-testid=action-bar-row] [data-testid=play-button]');
-        if (!b || location.pathname !== path) continue;
-        const label = (b.getAttribute('aria-label') || '').toLowerCase();
-        if (want && !label.includes(want) && i < 25) continue;   // still the previous page's button
-        if (!/pause/.test(label)) b.click();
-        return;
-      }
-    })();
+    this.go(path);
+    const want = (name || '').toLowerCase(), t0 = Date.now();
+    this.job('play', expired => {
+      const b = document.querySelector('#main-view [data-testid=action-bar-row] [data-testid=play-button]');
+      if (!b || location.pathname !== path) return expired;
+      const label = (b.getAttribute('aria-label') || '').toLowerCase();
+      if (want && !label.includes(want) && Date.now() - t0 < 4000 && !expired) return false;   // still the previous page's button
+      if (!/pause/.test(label)) b.click();
+      return true;
+    }, 9000);
     return 'ok';
   },
   // Search songs: open Spotify's song results for the words and read the first rows.
   search(q) {
-    const id = this._findId = (this._findId || 0) + 1;
     window.__msFind = { state: 'busy', q };
-    (async () => {
-      const rowSel = '#main-view [data-testid=tracklist-row]';
-      const before = (document.querySelector(rowSel) || {}).textContent || '';
-      const path = '/search/' + encodeURIComponent(q) + '/tracks';
-      this.go(path);
-      let rows = [];
-      for (let i = 0; i < 50 && this._findId === id; i++) {
-        await this.wait(150);
-        rows = [...document.querySelectorAll(rowSel)];
-        if (rows.length && (rows[0].textContent !== before || i > 20)) break;
-      }
-      if (this._findId !== id) return;
+    const rowSel = '#main-view [data-testid=tracklist-row]';
+    const before = (document.querySelector(rowSel) || {}).textContent || '';
+    const path = '/search/' + encodeURIComponent(q) + '/tracks';
+    const same = location.pathname === path;
+    this.go(path);
+    const t0 = Date.now();
+    this.job('find', expired => {
+      const rows = [...document.querySelectorAll(rowSel)];
+      const ready = rows.length && (same || rows[0].textContent !== before || Date.now() - t0 > 3500);
+      if (!ready && !expired) return false;
       const items = rows.slice(0, 40).map((r, i) => {
         const t = r.querySelector('a[data-testid=internal-track-link]') || r.querySelector('[aria-colindex=""2""] .encore-internal-color-text-base');
         const artists = [...r.querySelectorAll('a[href^=""/artist/""]')].map(a => a.textContent.trim()).filter(Boolean);
@@ -519,7 +535,8 @@ const ms = window.__ms = {
         return { i, name: t ? t.textContent.trim() : '', sub: [...new Set(artists)].join(', '), img: img ? (img.currentSrc || img.src || '') : '' };
       }).filter(x => x.name);
       window.__msFind = { state: 'done', q, items };
-    })().catch(e => { window.__msFind = { state: 'error', error: String(e) }; });
+      return true;
+    }, 9000);
     return 'started';
   },
   playFound(i) {

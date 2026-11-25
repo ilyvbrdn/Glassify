@@ -284,8 +284,8 @@ namespace Glassify
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 g.ColumnDefinitions.Add(new ColumnDefinition());
                 var pic = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(5), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)) };
-                if (!string.IsNullOrEmpty(img) && img.StartsWith("https://"))
-                    try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(img); bi.DecodePixelWidth = 60; bi.EndInit(); pic.Child = new Image { Source = bi, Stretch = Stretch.UniformToFill, Clip = new RectangleGeometry(new Rect(0, 0, 30, 30), 5, 5) }; } catch { }
+                var src = Pic(img, 60);
+                if (src != null) pic.Child = new Image { Source = src, Stretch = Stretch.UniformToFill, Clip = new RectangleGeometry(new Rect(0, 0, 30, 30), 5, 5) };
                 g.Children.Add(pic);
                 var label = new TextBlock { Text = name, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 4, 0) };
                 Grid.SetColumn(label, 1); g.Children.Add(label);
@@ -296,7 +296,8 @@ namespace Glassify
                 {
                     _title.Text = name; _artist.Text = "Starting...";
                     await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(uri) + "," + Program.Json.Serialize(name) + ")");
-                    await Task.Delay(1500); await Refresh();
+                    await PumpFor(9000);
+                    await Task.Delay(800); await Refresh();
                 };
                 _recents.Children.Add(tile);
             }
@@ -374,9 +375,10 @@ namespace Glassify
             if (_popup.IsOpen) { _popup.IsOpen = false; return; }
             _popup.IsOpen = true;
             Activate();                       // so you can type in the search box
-            // focus the search box with its old text selected, so typing starts a new search
-            Dispatcher.BeginInvoke(new Action(() => { _search.Focus(); Keyboard.Focus(_search); _search.SelectAll(); }), DispatcherPriority.Input);
-            if (_search.Text.Trim().Length == 0) ShowLibrary();
+            // always open on your library, with an empty search box ready for typing
+            if (_search.Text.Length > 0) _search.Text = "";   // (clearing it shows the library)
+            else ShowLibrary();
+            Dispatcher.BeginInvoke(new Action(() => { _search.Focus(); Keyboard.Focus(_search); }), DispatcherPriority.Input);
         }
 
         async void ShowLibrary()
@@ -412,7 +414,8 @@ namespace Glassify
                 while (DateTime.UtcNow < until)
                 {
                     await Task.Delay(200);
-                    var json = await Program.Eval(read);
+                    // run the page's next steps (its own timers are slowed down while Glassify's window is hidden), then read
+                    var json = await Program.Eval("(window.__ms && __ms.pump && __ms.pump(), " + read + ")");
                     if (string.IsNullOrEmpty(json) || json == "null") continue;
                     if (!(Program.Json.DeserializeObject(json) is Dictionary<string, object> st)) continue;
                     var state = Program.Str(st, "state");
@@ -426,6 +429,33 @@ namespace Glassify
             }
             catch (Exception ex) { Program.Log("bar menu: " + ex.Message); }
             return null;
+        }
+
+        /// Keep the page's steps going (e.g. "open this playlist, then press play") until they're done.
+        async Task PumpFor(int ms)
+        {
+            var until = DateTime.UtcNow.AddMilliseconds(ms);
+            while (DateTime.UtcNow < until)
+            {
+                await Task.Delay(200);
+                var left = await Program.Eval("window.__ms && __ms.pump ? String(__ms.pump()) : '0'");
+                if (left == "0" || left == null) return;
+            }
+        }
+
+        static ImageSource Pic(string url, int px)
+        {
+            if (string.IsNullOrEmpty(url)) return null;
+            try
+            {
+                var bi = new BitmapImage(); bi.BeginInit(); bi.DecodePixelWidth = px;
+                if (url.StartsWith("https://")) bi.UriSource = new Uri(url);
+                else if (url.StartsWith("data:image/png;base64,") || url.StartsWith("data:image/jpeg;base64,"))
+                { bi.StreamSource = new System.IO.MemoryStream(Convert.FromBase64String(url.Substring(url.IndexOf(',') + 1))); bi.CacheOption = BitmapCacheOption.OnLoad; }
+                else return null;
+                bi.EndInit(); return bi;
+            }
+            catch { return null; }
         }
 
         void Message(string text)
@@ -447,8 +477,8 @@ namespace Glassify
                 g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
                 g.ColumnDefinitions.Add(new ColumnDefinition());
                 var pic = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(songs ? 4 : 6), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center };
-                if (!string.IsNullOrEmpty(img) && img.StartsWith("https://"))
-                    try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(img); bi.DecodePixelWidth = 80; bi.EndInit(); var im = new Image { Source = bi, Stretch = Stretch.UniformToFill }; im.Clip = new RectangleGeometry(new Rect(0, 0, 40, 40), songs ? 4 : 6, songs ? 4 : 6); pic.Child = im; } catch { }
+                var src = Pic(img, 80);
+                if (src != null) { var im = new Image { Source = src, Stretch = Stretch.UniformToFill }; im.Clip = new RectangleGeometry(new Rect(0, 0, 40, 40), songs ? 4 : 6, songs ? 4 : 6); pic.Child = im; }
                 g.Children.Add(pic);
                 var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
                 text.Children.Add(new TextBlock { Text = name, Foreground = Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
@@ -463,8 +493,8 @@ namespace Glassify
                     _popup.IsOpen = false;
                     _title.Text = name; _artist.Text = songs ? sub : "Starting...";
                     if (songs) await Program.Eval("window.__ms && __ms.playFound(" + Convert.ToString(item.TryGetValue("i", out var i) ? i : 0, CultureInfo.InvariantCulture) + ")");
-                    else await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(Program.Str(item, "uri")) + "," + Program.Json.Serialize(name) + ")");
-                    await Task.Delay(1500); await Refresh();
+                    else { await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(Program.Str(item, "uri")) + "," + Program.Json.Serialize(name) + ")"); await PumpFor(9000); }
+                    await Task.Delay(800); await Refresh();
                 };
                 _list.Children.Add(row);
             }

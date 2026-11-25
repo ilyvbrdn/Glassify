@@ -19,25 +19,37 @@ a tiny always-on-top mini player, and switches to a click-through "ghost" mini p
 fullscreen game starts. You also choose how it looks: see-through glass, solid or light, in any colours.
 
 ## Screenshots
+**The bar**: the player docked to the top (or bottom) of your screen, with next in queue and your recent playlists
+
+![The bar](screenshots/glassify-bar.png)
+
 | | |
 |---|---|
 | ![Glass, pink](screenshots/glassify-glass-pink.png) **Glass** | ![Settings, blue](screenshots/glassify-settings-blue.png) **Settings (gear menu)** |
 | ![Glass focused, green](screenshots/glassify-focused-green.png) **Glass focused** | ![Solid, amber](screenshots/glassify-solid-amber.png) **Solid** |
-| ![Light](screenshots/glassify-light.png) **Light (lightest on CPU)** | ![Mini player](screenshots/glassify-mini.png) **Mini player in three colours** |
-| ![Ghost mini player](screenshots/glassify-ghost.png) **Ghost mini player (while gaming)** | |
+| ![Light](screenshots/glassify-light.png) **Light (lightest on CPU)** | ![The bar's menu](screenshots/glassify-bar-menu.png) **The bar's menu: your library and song search** |
+| ![Mini player, wide](screenshots/glassify-mini-wide.png) **Mini player, any size: wide...** | ![Mini player, tall](screenshots/glassify-mini-tall.png) **...or tall** |
+| ![Mini player](screenshots/glassify-mini.png) **Mini player in three colours** | ![Ghost mini player](screenshots/glassify-ghost.png) **Ghost mini player (while gaming)** |
 
 Screenshots use a demo library; your own playlists are never part of the app or this repo.
 
 ## Features
 - **Look slider** (gear menu): Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
-- **Colours**: panel colour, transparency and highlight colour.
-- **Mini player**: always on top, cover art, play/pause/next/previous, like, click the bar to seek,
-  mouse wheel for volume, three sizes, button to open the main player.
-- **Minimize to mini player**: minimizing hides the main window and leaves only the mini player.
-- **Automatic game mode**: when a fullscreen game starts, switches to the mini player and low priority;
-  restores everything when the game closes.
+- **Colours**: panel colour, transparency and highlight colour, plus an optional glass top bar with its own
+  colour and transparency.
+- **One player, two shapes**: a floating **mini player** or a **bar** docked to the top or bottom of the screen.
+  Ctrl+Alt+B (or the shape buttons) turns one into the other.
+  - **Mini player**: always on top, drag any edge or corner to any size (tall gives a big cover), cover art,
+    controls, like, click the bar to seek, mouse wheel for volume, button to open the main player.
+  - **Bar**: takes its space like the taskbar (windows make room for it), steps aside for fullscreen games,
+    shows the song, a timeline with the like button, **next in queue** and your **recently played playlists**.
+    Its menu lists your library and searches songs. Adapts to any screen, from laptops to ultra-wides.
+- **Minimize to the player**: minimizing hides the main window and leaves the player; a tray icon by the clock
+  shows Glassify is still running.
+- **Automatic game mode**: when a fullscreen game starts, switches to the player and low priority;
+  restores everything when the game closes. Screenshot tools and fullscreen videos don't count as games.
 - **Ghost mini player**: see-through and click-through while gaming (Ctrl+Alt+G any time).
-- **Song-change popup** (optional), **start with Windows** (optional, can start straight into the mini player).
+- **Song-change popup** (optional), **start with Windows** (optional, can start straight into the player).
 - **Crash recovery**: if Spotify's page crashes it reloads and keeps playing.
 - **One-click updates**: checks this repo's latest GitHub Release once a day; one click installs it and
   restarts, keeping your login, settings and music.
@@ -45,7 +57,8 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 ## Shortcuts
 | Keys | Action |
 |---|---|
-| Ctrl+Alt+M | show / hide mini player |
+| Ctrl+Alt+M | show / hide the player |
+| Ctrl+Alt+B | switch the player between mini player and bar |
 | Ctrl+Alt+G | ghost (click-through) mini player |
 | Ctrl+Alt+L | like current song |
 | Ctrl+Alt+Up / Down | volume |
