@@ -6,6 +6,11 @@ A light, floating, glass-styled Windows player for Spotify. It runs Spotify's ow
 your library and Premium all work normally) inside a minimal see-through window, with a floating mini player
 and features for listening while gaming.
 
+## Download
+Get **[the latest release](https://github.com/ilyvbrdn/Glassify/releases/latest)**, extract the zip to a folder
+you can write to (not Program Files) and run `Glassify.exe`. On first launch Windows may show
+"Windows protected your PC": click **More info → Run anyway** (the app isn't code-signed).
+
 ## Why Glassify?
 The official Spotify app for Windows is heavy: it is slow to open, keeps using CPU and memory in the
 background and is hard to keep out of the way while you play games. Glassify is a lighter shell around
