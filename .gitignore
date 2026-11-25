@@ -6,3 +6,5 @@ app/obj/
 data/
 *.log
 archive/
+# icon size-check sheet from tools/make-icon.ps1 (local only)
+icon-preview.png
