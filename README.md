@@ -26,7 +26,7 @@ fullscreen game starts. You also choose how it looks: see-through glass, solid o
 | | |
 |---|---|
 | ![Glass, pink](screenshots/glassify-glass-pink.png) **Glass** | ![Settings, blue](screenshots/glassify-settings-blue.png) **Settings (gear menu)** |
-| ![Glass focused, green](screenshots/glassify-focused-green.png) **Glass focused** | ![Solid, amber](screenshots/glassify-solid-amber.png) **Solid** |
+| ![Glass, green](screenshots/glassify-focused-green.png) **Glass, green** | ![Solid, amber](screenshots/glassify-solid-amber.png) **Solid** |
 | ![Light](screenshots/glassify-light.png) **Light (lightest on CPU)** | ![The bar's menu](screenshots/glassify-bar-menu.png) **The bar's menu: your library and song search** |
 | ![Mini player, wide](screenshots/glassify-mini-wide.png) **Mini player, any size: wide...** | ![Mini player, tall](screenshots/glassify-mini-tall.png) **...or tall** |
 | ![Mini player](screenshots/glassify-mini.png) **Mini player in three colours** | ![Ghost mini player](screenshots/glassify-ghost.png) **Ghost mini player (while gaming)** |
@@ -35,7 +35,7 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 
 ## Features
 - **Settings** (gear menu) in four tabs: Look, Player, Gaming, More.
-- **Look slider**: Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
+- **Look slider**: Glass, Solid, Light. Light is the lightest on CPU.
 - **Colours**: panel colour or a **two-colour gradient** with any angle and a balance slider (it flows across the whole
   window, and the mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
   the panels or has its own colour and transparency. The search box and home button follow the gradient too.

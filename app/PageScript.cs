@@ -79,14 +79,15 @@ if (window.__ms) { window.__ms.cssText = CSS; try { window.__ms.apply(); } catch
 const id='minispotify-theme';
 const q=s=>document.querySelector(s);
 const post=m=>{ try { window.chrome.webview.postMessage(m); } catch(e){} };
-// Look levels: 5 Glass, 4 Glass focused, 3 Solid, 2 Light (lightest). (A graphics-off level was removed:
-// the browser engine keeps its graphics process anyway, so it saved nothing and cost CPU.)
+// Look levels: 5 Glass, 3 Solid, 2 Light (lightest). (Removed: a graphics-off level, since the browser engine keeps
+// its graphics process anyway, and 'Glass focused' (4), which only force-closed the Now playing panel: Spotify keeps
+// that panel loaded either way, so it saved nothing. A saved 4 counts as Glass.)
 const LEVELS = {
-  5: ['Glass', 'Floating see-through glass, everything shown.'],
-  4: ['Glass, focused', 'Floating glass; Now Playing panel closed.'],
-  3: ['Solid', 'Normal solid window: no see-through or glass effects. Now Playing panel closed.'],
+  5: ['Glass', 'Floating see-through glass.'],
+  3: ['Solid', 'Normal solid window: no see-through or glass effects.'],
   2: ['Light', 'The lightest: flat solid colours (no glass, gradient or top bar), no cover art in lists, animations paused, low priority, memory saver. Every button still works.'] };
 const glassOf = l => l >= 4, gpuOf = l => true;
+const LVLS = [2, 3, 5];   // the Look slider's three stops, left to right
 const ms = window.__ms = {
   cssText: CSS,
   art() {
@@ -108,7 +109,6 @@ const ms = window.__ms = {
     this.controls(); this.edges();
     if (!this.spotify) return;
     if (!this._looked) { this._looked = true; this.startLevel = this.level(); this.applyLook(); }
-    this.nowPlayingPanel();
     this.resume();
     this.heartbeat();
     if (this._update && !document.getElementById('ms-update')) this.showUpdate(this._update.tag, this._update.url, this._update.auto);
@@ -197,7 +197,7 @@ const ms = window.__ms = {
     if (v.lvl === undefined && v.mem !== undefined) v.lvl = 5;   // older settings
     return v;
   },
-  level() { return Math.max(2, Math.min(5, Math.round(+this.look().lvl) || 5)); },
+  level() { const l = Math.max(2, Math.min(5, Math.round(+this.look().lvl) || 5)); return l === 4 ? 5 : l; },
   setLook(v) {
     try { localStorage.setItem('ms-look', JSON.stringify(v)); } catch (e) {}
     this.applyLook();
@@ -250,30 +250,6 @@ const ms = window.__ms = {
     const state = 'eco=' + (eco ? 1 : 0) + ',lvl=' + lvl + ',mini=' + (v.miniOnMin ? 1 : 0);
     if (this._state !== state) { this._state = state; post('power:' + state); }
   },
-  // Levels 4 and below close Spotify's right 'Now playing' panel whenever it appears.
-  // Back at level 5 it re-opens once (the flag survives the restart), then it's up to you.
-  nowPlayingPanel() {
-    const lvl = this.level();
-    const panel = document.getElementById('Desktop_PanelContainer_Id');
-    // When closed, Spotify shrinks the panel's column to a thin strip but keeps the panel itself full width inside it,
-    // so 'open' means the narrowest of its containers is wide.
-    let visible = false;
-    if (panel) { let w = panel.getBoundingClientRect().width; for (let a = panel.parentElement, k = 0; a && k < 5; a = a.parentElement, k++) w = Math.min(w, a.getBoundingClientRect().width); visible = w > 120; }
-    if (lvl <= 4) {
-      if (!visible) return;
-      const hide = [...panel.querySelectorAll('button')].find(b => /^(hide|close)/i.test(b.getAttribute('aria-label') || ''));
-      if (hide) hide.click();
-      return;
-    }
-    let reopen = false; try { reopen = localStorage.getItem('ms-npv-open') === '1'; } catch (e) {}
-    if (!reopen) return;
-    const done = () => { try { localStorage.removeItem('ms-npv-open'); } catch (e) {} };
-    if (visible) { done(); return; }
-    const open = [...document.querySelectorAll('button')].find(b => /^show now playing/i.test(b.getAttribute('aria-label') || ''))
-              || q('[data-testid=""now-playing-bar""] [data-testid=""cover-art-button""]');
-    if (!open) return;
-    done(); open.click();
-  },
   // After Glassify restarts itself (look change) or recovers from a crash, carry on playing:
   // if music was playing within the last ~20 seconds before this page loaded, press play once it's ready.
   resume() {
@@ -304,7 +280,7 @@ const ms = window.__ms = {
       '<div class=""ms-tabs"">' + [['look','Look'],['player','Player'],['gaming','Gaming'],['more','More']].map(x => '<button class=""ms-tab"" data-t=""' + x[0] + '"">' + x[1] + '</button>').join('') + '</div>' +
       '<div class=""ms-page"" data-p=""look"">' +
       '<div class=""ms-h"">Look <span class=""ms-lvlname ms-val""></span></div>' +
-      '<input class=""ms-lvl"" type=""range"" min=""2"" max=""5"" step=""1"" value=""' + this.level() + '"">' +
+      '<input class=""ms-lvl"" type=""range"" min=""0"" max=""2"" step=""1"" value=""' + LVLS.indexOf(this.level()) + '"">' +
       '<div class=""ms-desc ms-lvldesc""></div>' +
       '<div class=""ms-h"">Panel colour</div>' + row('ms-panel', panelSw, v.color) +
       '<label class=""ms-check ms-gradchk""><input type=""checkbox""' + (v.grad ? ' checked' : '') + '><span><b>Gradient</b><br>Blend the panel colour into a second colour</span></label>' +
@@ -341,9 +317,10 @@ const ms = window.__ms = {
     const minimin = $('.ms-minimin input'), note = $('.ms-note');
     const topChk = $('.ms-top input'), tpick = $('.ms-topc input'), trange = $('.ms-toprange');
     const gradChk = $('.ms-gradchk input'), pick2 = $('.ms-panel2 input'), ang = $('.ms-ang'), topMatch = $('.ms-topmatch input'), midR = $('.ms-mid');
-    const needsRestart = () => { const l = +lvlR.value; return glassOf(l) !== glassOf(start) || gpuOf(l) !== gpuOf(start); };
+    const lv = () => LVLS[+lvlR.value] || 5;
+    const needsRestart = () => { const l = lv(); return glassOf(l) !== glassOf(start) || gpuOf(l) !== gpuOf(start); };
     const show = () => {
-      const l = +lvlR.value;
+      const l = lv();
       $('.ms-lvlname').textContent = LEVELS[l][0];
       $('.ms-lvldesc').textContent = LEVELS[l][1];
       $('.ms-alphaval').textContent = range.value + '%';
@@ -361,7 +338,7 @@ const ms = window.__ms = {
       $('.ms-topval').textContent = trange.value + '%';
       note.textContent = needsRestart() ? 'Done restarts Glassify (about 3 s) to apply this. Your song keeps going.' : '';
     };
-    const save = () => this.setLook({ color: pick.value, alpha: 100 - (+range.value), accent: apick.value, eco: false, lvl: +lvlR.value, miniOnMin: minimin.checked,
+    const save = () => this.setLook({ color: pick.value, alpha: 100 - (+range.value), accent: apick.value, eco: false, lvl: lv(), miniOnMin: minimin.checked,
                                       top: topChk.checked, topColor: tpick.value, topAlpha: 100 - (+trange.value), topMatch: topMatch.checked,
                                       grad: gradChk.checked, color2: pick2.value, angle: +ang.value, mid: +midR.value });
     const update = () => { show(); save(); };
@@ -393,12 +370,11 @@ const ms = window.__ms = {
     p.querySelectorAll('.ms-panel button').forEach(b => b.onclick = () => { pick.value = b.dataset.c; update(); });
     p.querySelectorAll('.ms-accent button').forEach(b => b.onclick = () => { apick.value = b.dataset.c; update(); });
     pick.oninput = update; apick.oninput = update; range.oninput = update;
-    $('.ms-reset').onclick = () => { lvlR.value = 5; pick.value = '#5a2448'; apick.value = '#ff5fa8'; range.value = 18; minimin.checked = false;
+    $('.ms-reset').onclick = () => { lvlR.value = LVLS.indexOf(5); pick.value = '#5a2448'; apick.value = '#ff5fa8'; range.value = 18; minimin.checked = false;
       topChk.checked = false; tpick.value = '#101014'; trange.value = 30; topMatch.checked = true;
       gradChk.checked = false; pick2.value = '#3b2a6e'; ang.value = 135; midR.value = 50; update(); };
     $('.ms-done').onclick = () => {
       p.remove();
-      if (+lvlR.value === 5 && start <= 4) { try { localStorage.setItem('ms-npv-open', '1'); } catch (e) {} }
       if (needsRestart()) {
         const pp = q('[data-testid=""control-button-playpause""]');
         if (pp && /pause/i.test(pp.getAttribute('aria-label') || '')) { try { localStorage.setItem('ms-resume', String(Date.now())); } catch (e) {} }
