@@ -55,8 +55,9 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 - **Ghost mini player**: see-through and click-through while gaming (Ctrl+Alt+G any time).
 - **Song-change popup** (optional), **start with Windows** (optional, can start straight into the player).
 - **Crash recovery**: if Spotify's page crashes it reloads and keeps playing.
-- **One-click updates**: checks this repo's latest GitHub Release once a day; one click installs it and
-  restarts, keeping your login, settings and music.
+- **Automatic updates**: checks this repo's latest GitHub Release a few seconds after starting and every 2 hours,
+  and installs it by itself in seconds (never during a game), keeping your login, settings and music. Can be
+  switched off in Settings > More; then the update button installs it in one click.
 
 ## Shortcuts
 | Keys | Action |
@@ -88,7 +89,8 @@ Your login and settings live in a `data` folder next to the exe. **Never share o
    (never `data`).
 3. Create a GitHub Release with a higher tag (like `v1.1.0`) and attach the zip.
 
-Running copies check once a day and show an update button (top right). One click downloads the zip from this
+Running copies check a few seconds after starting and every 2 hours, then install it automatically (or, with
+automatic updates off, show an update button at the top right). The update downloads the zip from this
 repo's releases, checks it against GitHub's SHA-256 fingerprint, swaps the program files (the `data` folder with
 the login and settings is never touched) and restarts with the music still playing. If anything goes wrong it
 puts the old files back and opens the release page instead. If Glassify can't write to its own folder (for
