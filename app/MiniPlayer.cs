@@ -79,8 +79,8 @@ namespace Glassify
             {
                 try
                 {
-                    if (_win.Ghost) { _ghostManual = false; _win.SetGhost(false); _win.Hide(); }   // ghost showing: Ctrl+Alt+M hides it
-                    else if (_win.IsVisible) _win.Hide(); else _win.ShowMini();
+                    if (_win.Ghost) { _ghostManual = false; _win.SetGhost(false); _win.Hide(); Program.Window?.PlayerHiddenByUser(); }   // ghost showing: Ctrl+Alt+M hides it
+                    else if (_win.IsVisible) { _win.Hide(); Program.Window?.PlayerHiddenByUser(); } else _win.ShowMini();
                 }
                 catch (Exception ex) { Program.Log("mini show: " + ex); }
             }));
@@ -358,7 +358,7 @@ namespace Glassify
             Grid.SetColumn(right, 1);
             content.Children.Add(right);
 
-            var close = IconButton("", 10, 24, Hide, "Hide mini player");
+            var close = IconButton("", 10, 24, () => { Hide(); Program.Window?.PlayerHiddenByUser(); }, "Hide mini player");
             close.HorizontalAlignment = HorizontalAlignment.Right; close.VerticalAlignment = VerticalAlignment.Top; close.Margin = new Thickness(0, 6, 6, 0);
             close.Opacity = 0;
 

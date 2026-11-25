@@ -143,13 +143,38 @@ namespace Glassify
         static string TestFeed => File.Exists(Path.Combine(Program.Data, "debug")) && File.Exists(Path.Combine(Program.Data, "update-feed.json")) ? Path.Combine(Program.Data, "update-feed.json") : null;
         public static bool CanAutoUpdate => AssetUrl != null && FolderWritable();
 
-        public static void Start() => _timer = new Timer(_ => Check(), null, TestFeed != null ? 3000 : 20000, 24 * 3600 * 1000);
+        // Checks a few seconds after start, then every 2 hours. With "Install updates automatically" (on by default) a
+        // newer version installs by itself (the zip is under 1 MB, so it takes seconds) and Glassify restarts the way it
+        // was, music still playing. Never during a game: it waits for the game to end.
+        static readonly int Every = 2 * 3600 * 1000;
+        public static void Start() => _timer = new Timer(_ => Check(), null, 4000, Every);
+
+        static string LastAutoFile => Path.Combine(Program.Data, "auto-updated.txt");
+        static bool _autoFailed;
+        static int _checkFails;
 
         static void Check()
         {
-            try { Fetch(); }
+            bool newer = false;
+            try { newer = Fetch(); }
             catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { Clear(); /* no releases */ }
-            catch (Exception ex) { Program.Log("update check: " + ex.Message); }
+            catch (Exception ex)
+            {
+                Program.Log("update check: " + ex.Message);
+                // just started with Windows, the internet may not be up yet: try again in a minute (a few times)
+                if (++_checkFails <= 3) _timer?.Change(60 * 1000, Every);
+                return;
+            }
+            _checkFails = 0;
+            if (!newer || !Opts.AutoUpdate || _autoFailed || !CanAutoUpdate) return;
+            // safety: if this exact version was already auto-installed and we're still not on it (a release whose files
+            // say an older version), don't install it again and again; the button stays for a manual try.
+            string last = null; try { last = File.ReadAllText(LastAutoFile).Trim(); } catch { }
+            if (last == LatestTag) return;
+            if (GameMode.Active) { _timer?.Change(5 * 60 * 1000, Every); return; }   // playing a game: try again in 5 minutes
+            try { File.WriteAllText(LastAutoFile, LatestTag); } catch { }
+            Program.Log("installing " + LatestTag + " automatically");
+            Apply(auto: true);
         }
 
         /// The update that was offered is gone (release removed, or already on the newest): hide the button.
@@ -205,7 +230,7 @@ namespace Glassify
         }
 
         /// The update button was clicked: download, verify, swap the files, restart. Runs off the UI thread.
-        public static void Apply()
+        public static void Apply(bool auto = false)
         {
             if (Interlocked.Exchange(ref _busy, 1) == 1) return;
             var work = Path.Combine(Program.Data, "update");
@@ -271,7 +296,9 @@ namespace Glassify
                 }
                 try { Directory.Delete(work, true); } catch { }
                 Interlocked.Exchange(ref _busy, 0);
-                Program.Window?.UpdateFailed(LatestUrl);
+                // automatic try: fail quietly (the update button stays for a manual try); clicked: say so and open the page
+                if (auto) _autoFailed = true;
+                else Program.Window?.UpdateFailed(LatestUrl);
             }
         }
 

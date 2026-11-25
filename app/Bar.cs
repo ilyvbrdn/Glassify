@@ -26,7 +26,9 @@ namespace Glassify
 
         public static void Show() => Run(w => w.ShowBar());
         public static void Hide() => Run(w => w.HideBar());
-        public static void ToggleVisible() => Run(w => { if (w.IsVisible) w.HideBar(); else w.ShowBar(); });
+        public static void ToggleVisible() => Run(w => { if (w.IsVisible) { w.HideBar(); Program.Window?.PlayerHiddenByUser(); } else w.ShowBar(); });
+        /// The bar's own hide button.
+        public static void HideByUser() => Run(w => { w.HideBar(); Program.Window?.PlayerHiddenByUser(); });
 
         /// Ctrl+Alt+B / the shape buttons: turn the mini player into the bar, or back. The player stays on screen.
         public static void Toggle()
@@ -191,7 +193,7 @@ namespace Glassify
             _btns = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             _btns.Children.Add(Btn("", 12, 30, () => Bar.Toggle(), "Turn into the mini player (Ctrl+Alt+B)"));
             _btns.Children.Add(Btn("", 12, 30, () => Program.FocusExisting(), "Open the main player"));
-            _btns.Children.Add(Btn("", 11, 30, () => Bar.Hide(), "Hide the player (Ctrl+Alt+M brings it back)"));
+            _btns.Children.Add(Btn("", 11, 30, () => Bar.HideByUser(), "Hide the player (Ctrl+Alt+M brings it back)"));
 
             BuildLayout(false);
             _root.MouseWheel += async (s, e) => { try { await Program.Eval("window.__ms && window.__ms.volume(" + (e.Delta > 0 ? "0.05" : "-0.05") + ")"); } catch { } };

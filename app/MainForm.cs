@@ -90,7 +90,7 @@ namespace Glassify
                 // tell the page the app's version and current options (the settings panel shows them)
                 var init = "window.__msVersion=" + Program.Json.Serialize(Program.Version) + ";window.__msOpts={game:" + B(Opts.GameMode) + ",ghost:" + B(Opts.Ghost) +
                            ",toast:" + B(Opts.Toast) + ",auto:" + B(Opts.AutoStart) + ",startmini:" + B(Opts.StartMini) +
-                           ",bar:" + B(Opts.Bar) + ",baredge:" + Program.Json.Serialize(Opts.BarEdge) + ",barmon:" + Program.Json.Serialize(Opts.BarMonitor) + "};" +
+                           ",bar:" + B(Opts.Bar) + ",autoupd:" + B(Opts.AutoUpdate) + ",baredge:" + Program.Json.Serialize(Opts.BarEdge) + ",barmon:" + Program.Json.Serialize(Opts.BarMonitor) + "};" +
                            "window.__msMonitors=" + BarWindow.MonitorsJson() + ";";
                 try { await core.ExecuteScriptAsync(init); } catch { }
                 try { await core.ExecuteScriptAsync(_js); } catch { }
@@ -140,19 +140,43 @@ namespace Glassify
         }
 
         // Started with Windows + "start in mini player": keep the main window hidden from the very first moment.
-        bool _startHidden = Program.StartedWithWindows && Opts.StartMini;
+        bool _startHidden = (Program.StartedWithWindows && Opts.StartMini) || Program.RestartedHidden;
         protected override void SetVisibleCore(bool value)
         {
-            if (_startHidden && value && !IsHandleCreated) { CreateHandle(); _hiddenToMini = true; value = false; Load_(); }
+            if (_startHidden && value && !IsHandleCreated)
+            {
+                CreateHandle();
+                // the browser control needs its own window too, or it waits for it forever and Spotify never loads
+                var browserHandle = _web.Handle;
+                _hiddenToMini = true; value = false; Load_();
+            }
             base.SetVisibleCore(value);
         }
         bool _loadedEarly;
-        void Load_() { if (_loadedEarly) return; _loadedEarly = true; BeginInvoke(new Action(async () => await Init())); }
+        void Load_() { if (_loadedEarly) return; _loadedEarly = true; BeginInvoke(new Action(async () => { try { await Init(); } catch (Exception ex) { Program.Log("start-up failed: " + ex); } })); }
 
         public void HideToMini()
         {
             _hiddenToMini = true;
             Hide(); ApplyPower(); Mini.ShowOnly();
+        }
+
+        /// You hid the player (its x button or Ctrl+Alt+M). If the main window was hidden into it, Glassify would vanish
+        /// from the screen and taskbar (only the tray icon left) and look closed: drop it to the taskbar, minimized, instead.
+        public void PlayerHiddenByUser()
+        {
+            try
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    if (Visible || _shuttingDown || GameMode.Active) return;   // a game hid it: game mode brings it back afterwards
+                    _hiddenToMini = true;                                       // so minimizing doesn't hide it straight back into the player
+                    WindowState = FormWindowState.Minimized;
+                    Show();
+                    ApplyPower();
+                }));
+            }
+            catch { }
         }
 
         public void RefreshPower() => ApplyPower();

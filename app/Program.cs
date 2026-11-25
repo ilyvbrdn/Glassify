@@ -18,6 +18,8 @@ namespace Glassify
         public static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
         public static MainForm Window;
         public static bool StartedWithWindows;
+        /// Restarted (update or look change) while the main window was hidden into the player: start that way again.
+        public static bool RestartedHidden;
 
         /// Look level chosen in settings (5 Glass .. 2 Light). Read before the window exists, because glass vs
         /// solid is decided when the window is created.
@@ -29,8 +31,24 @@ namespace Glassify
         /// Quick restart to apply a look change: start a fresh copy that waits for this one to close, then close.
         public static void Restart()
         {
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Path.Combine(Home, "Glassify.exe"), "--after=" + System.Diagnostics.Process.GetCurrentProcess().Id) { UseShellExecute = false }); } catch (Exception ex) { Log("restart: " + ex.Message); return; }
+            // hidden into the player (or the tray) right now: come back the same way, without the main window popping up
+            var args = "--after=" + System.Diagnostics.Process.GetCurrentProcess().Id + (Window != null && Window.IsHandleCreated && !Window.Visible ? " --hidden" : "");
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Path.Combine(Home, "Glassify.exe"), args) { UseShellExecute = false }); } catch (Exception ex) { Log("restart: " + ex.Message); return; }
             Window?.Close();
+        }
+
+        /// After a restart: the old copy's browser engine can still be letting go of the login profile for a moment.
+        /// Starting a new one on it then can hang (the page never loads), so wait until its lock file is free (max 10 s).
+        static void WaitForBrowserProfile()
+        {
+            var lockFile = Path.Combine(Data, "webview", "EBWebView", "lockfile");
+            for (int i = 0; i < 50; i++)
+            {
+                if (!File.Exists(lockFile)) return;
+                try { using (new FileStream(lockFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) return; } catch { }
+                Thread.Sleep(200);
+            }
+            Log("restart: browser profile still busy after 10 s");
         }
 
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetProcessDPIAware();
@@ -47,8 +65,12 @@ namespace Glassify
             {
                 // Started by Restart(): wait for the previous copy to finish closing (it saves your login on the way out).
                 if (a.StartsWith("--after=") && int.TryParse(a.Substring(8), out int prev))
+                {
                     try { System.Diagnostics.Process.GetProcessById(prev).WaitForExit(15000); } catch { }
+                    WaitForBrowserProfile();
+                }
                 if (a == "--startup") StartedWithWindows = true;
+                if (a == "--hidden") RestartedHidden = true;
             }
             using (var m = new Mutex(true, "Glassify.App", out bool first))
             {
@@ -145,7 +167,7 @@ namespace Glassify
     /// App options set from the settings panel, saved so they work before the page loads (start-up, game mode).
     static class Opts
     {
-        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarShown = false;
+        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarShown = false, AutoUpdate = true;
         /// Bar position: "top", "bottom", "left" or "right"; and its screen (Windows device name, "" = main screen).
         public static volatile string BarEdge = "top", BarMonitor = "";
         static string FilePath => Path.Combine(Program.Data, "opts.txt");
@@ -168,6 +190,7 @@ namespace Glassify
             {
                 case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break;
                 case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barshown": BarShown = v; break;
+                case "autoupd": AutoUpdate = v; break;
                 case "barbottom": if (v) BarEdge = "bottom"; break;   // older setting
                 case "baredge": if (s == "top" || s == "bottom" || s == "left" || s == "right") BarEdge = s; break;
                 case "barmon": BarMonitor = s ?? ""; break;
@@ -175,7 +198,7 @@ namespace Glassify
         }
         public static void Save()
         {
-            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbaredge={BarEdge}\r\nbarmon={BarMonitor}\r\nbarshown={B(BarShown)}\r\n"); } catch { }
+            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbaredge={BarEdge}\r\nbarmon={BarMonitor}\r\nbarshown={B(BarShown)}\r\nautoupd={B(AutoUpdate)}\r\n"); } catch { }
         }
         static string B(bool b) => b ? "1" : "0";
         /// From the page: "opts:game=1,ghost=1,toast=0,auto=0,startmini=0"

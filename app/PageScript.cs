@@ -306,6 +306,7 @@ const ms = window.__ms = {
       '<label class=""ms-check""><input type=""checkbox"" data-o=""toast""><span><b>Song-change popup</b><br>A small popup with the cover when the song changes (when Glassify isn\'t in front)</span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""auto""><span><b>Start with Windows</b></span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""autoupd""><span><b>Install updates automatically</b><br>Checks when Glassify starts and every 2 hours; a new version installs in a few seconds and your music keeps playing (never during a game)</span></label>' +
       '<div class=""ms-h"">Shortcuts</div>' +
       '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;mini player &harr; bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
       '<div class=""ms-desc ms-ver""></div>' +
@@ -500,8 +501,8 @@ const ms = window.__ms = {
     const b = document.getElementById('ms-update');
     if (b) { b.classList.remove('ms-busy'); b.title = 'Automatic update didn\'t work - click to open the download page'; }
   },
-  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false, bar: false, baredge: 'top', barmon: '' }, window.__msOpts || {}); },
-  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini','bar'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',') + ',baredge=' + (o.baredge || 'top') + ',barmon=' + String(o.barmon || '').replace(/[,=]/g, '')); },
+  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false, bar: false, autoupd: true, baredge: 'top', barmon: '' }, window.__msOpts || {}); },
+  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini','bar','autoupd'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',') + ',baredge=' + (o.baredge || 'top') + ',barmon=' + String(o.barmon || '').replace(/[,=]/g, '')); },
 
   // ---- for the bar's menu: your library, search, and playing what you pick ----
   // Results land in window.__msLib / window.__msFind ({state:'busy'|'done'|'error', items}); Glassify polls them.
