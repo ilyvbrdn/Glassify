@@ -10,7 +10,7 @@ namespace Glassify
 {
     static class Program
     {
-        public const string Version = "1.0.5";
+        public const string Version = "1.0.6";
         public const string UpdateRepo = "ilyvbrdn/Glassify";
 
         public static readonly string Home = AppDomain.CurrentDomain.BaseDirectory;
