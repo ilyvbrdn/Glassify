@@ -89,7 +89,9 @@ namespace Glassify
             {
                 // tell the page the app's version and current options (the settings panel shows them)
                 var init = "window.__msVersion=" + Program.Json.Serialize(Program.Version) + ";window.__msOpts={game:" + B(Opts.GameMode) + ",ghost:" + B(Opts.Ghost) +
-                           ",toast:" + B(Opts.Toast) + ",auto:" + B(Opts.AutoStart) + ",startmini:" + B(Opts.StartMini) + "};";
+                           ",toast:" + B(Opts.Toast) + ",auto:" + B(Opts.AutoStart) + ",startmini:" + B(Opts.StartMini) +
+                           ",bar:" + B(Opts.Bar) + ",baredge:" + Program.Json.Serialize(Opts.BarEdge) + ",barmon:" + Program.Json.Serialize(Opts.BarMonitor) + "};" +
+                           "window.__msMonitors=" + BarWindow.MonitorsJson() + ";";
                 try { await core.ExecuteScriptAsync(init); } catch { }
                 try { await core.ExecuteScriptAsync(_js); } catch { }
                 if (Updates.LatestTag != null) ShowUpdate(Updates.LatestTag, Updates.LatestUrl, Updates.CanAutoUpdate);

@@ -41,9 +41,11 @@ Screenshots use a demo library; your own playlists are never part of the app or 
   Ctrl+Alt+B (or the shape buttons) turns one into the other.
   - **Mini player**: always on top, drag any edge or corner to any size (tall gives a big cover), cover art,
     controls, like, click the bar to seek, mouse wheel for volume, button to open the main player.
-  - **Bar**: takes its space like the taskbar (windows make room for it), steps aside for fullscreen games,
-    shows the song, a timeline with the like button, **next in queue** and your **recently played playlists**.
-    Its menu lists your library and searches songs. Adapts to any screen, from laptops to ultra-wides.
+  - **Bar**: docks to the **top, bottom, left or right** edge of **any screen** (drag its grip to an edge, or
+    pick in the gear menu). Takes its space like the taskbar (windows make room for it), steps aside for
+    fullscreen games, shows the song, a timeline with the like button, **next in queue** and your **recently
+    played playlists**; on the left or right it becomes a sidebar with a big cover. Its menu lists your library
+    and searches songs. Adapts to any screen, from laptops to ultra-wides.
 - **Minimize to the player**: minimizing hides the main window and leaves the player; a tray icon by the clock
   shows Glassify is still running.
 - **Automatic game mode**: when a fullscreen game starts, switches to the player and low priority;

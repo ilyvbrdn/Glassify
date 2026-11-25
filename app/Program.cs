@@ -139,7 +139,9 @@ namespace Glassify
     /// App options set from the settings panel, saved so they work before the page loads (start-up, game mode).
     static class Opts
     {
-        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarBottom = false, BarShown = false;
+        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarShown = false;
+        /// Bar position: "top", "bottom", "left" or "right"; and its screen (Windows device name, "" = main screen).
+        public static volatile string BarEdge = "top", BarMonitor = "";
         static string FilePath => Path.Combine(Program.Data, "opts.txt");
         public static void Load()
         {
@@ -148,19 +150,26 @@ namespace Glassify
                 foreach (var line in File.ReadAllLines(FilePath))
                 {
                     var p = line.Split('='); if (p.Length != 2) continue;
-                    bool v = p[1].Trim() == "1";
-                    Set(p[0].Trim(), v);
+                    Set(p[0].Trim(), p[1].Trim());
                 }
             }
             catch { }
         }
-        static void Set(string k, bool v)
+        static void Set(string k, string s)
         {
-            switch (k) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barbottom": BarBottom = v; break; case "barshown": BarShown = v; break; }
+            bool v = s == "1";
+            switch (k)
+            {
+                case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break;
+                case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barshown": BarShown = v; break;
+                case "barbottom": if (v) BarEdge = "bottom"; break;   // older setting
+                case "baredge": if (s == "top" || s == "bottom" || s == "left" || s == "right") BarEdge = s; break;
+                case "barmon": BarMonitor = s ?? ""; break;
+            }
         }
         public static void Save()
         {
-            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbarbottom={B(BarBottom)}\r\nbarshown={B(BarShown)}\r\n"); } catch { }
+            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbaredge={BarEdge}\r\nbarmon={BarMonitor}\r\nbarshown={B(BarShown)}\r\n"); } catch { }
         }
         static string B(bool b) => b ? "1" : "0";
         /// From the page: "opts:game=1,ghost=1,toast=0,auto=0,startmini=0"
@@ -168,8 +177,8 @@ namespace Glassify
         {
             foreach (var kv in s.Split(','))
             {
-                var p = kv.Split('='); if (p.Length != 2) continue;
-                Set(p[0], p[1] == "1");
+                int i = kv.IndexOf('='); if (i < 1) continue;
+                Set(kv.Substring(0, i), kv.Substring(i + 1));
             }
             Save();
             SetAutoStart(AutoStart);

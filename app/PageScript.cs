@@ -40,6 +40,12 @@ const BASE=`
 #ms-winctl #ms-update.ms-busy { animation: ms-pulse 1s ease-in-out infinite !important; animation-play-state: running !important; cursor: progress; }
 @keyframes ms-pulse { 50% { opacity: .3; } }
 #ms-settings .ms-row { display: flex; justify-content: flex-end; gap: 8px; }
+#ms-settings .ms-edges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+#ms-settings .ms-pill { border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 4px 12px; background: rgba(255,255,255,.06); color: #eee; cursor: pointer; font: inherit; font-size: 12px; }
+#ms-settings .ms-pill:hover { background: rgba(255,255,255,.14); }
+#ms-settings .ms-pill.ms-on { background: var(--ms-accent, #ff5fa8); color: var(--ms-accent-ink, #1a0710); border-color: transparent; font-weight: 600; }
+#ms-settings .ms-mon { width: 100%; margin: 0 0 12px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,.08); color: #eee; border: 1px solid rgba(255,255,255,.18); font: inherit; font-size: 12px; }
+#ms-settings .ms-mon option { background: #1c1620; color: #eee; }
 #ms-settings .ms-row button { border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; background: rgba(255,255,255,.1); color: #eee; }
 #ms-settings .ms-row .ms-done { background: var(--ms-accent, #ff5fa8); color: var(--ms-accent-ink, #1a0710); font-weight: 600; }
 html.ms-eco *, html.ms-eco *::before, html.ms-eco *::after { animation-play-state: paused !important; }
@@ -290,7 +296,9 @@ const ms = window.__ms = {
       '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
       '<div class=""ms-h"">Player shape</div>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Bar shape</b><br>Turn the mini player into a bar docked to the edge of your screen, with next in queue, recent playlists and search (Ctrl+Alt+B switches)</span></label>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""barbottom""><span><b>Bar at the bottom</b><br>Dock it to the bottom of the screen instead of the top</span></label>' +
+      '<div class=""ms-h"">Bar position</div><div class=""ms-edges"">' + [['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']].map(e => '<button class=""ms-pill"" data-e=""' + e[0] + '"">' + e[1] + '</button>').join('') + '</div>' +
+      '<div class=""ms-desc"" style=""min-height:0"">Or drag the grip on the bar to any edge of any screen.</div>' +
+      '<div class=""ms-monwrap""><div class=""ms-h"">Bar screen</div><select class=""ms-mon"">' + (window.__msMonitors || []).map(m => '<option value=""' + String(m.id).replace(/""/g, '') + '"">' + m.name + '</option>').join('') + '</select></div>' +
       '<div class=""ms-h"">Shortcuts</div>' +
       '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;mini player &harr; bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
       '<div class=""ms-desc ms-ver""></div>' +
@@ -321,6 +329,18 @@ const ms = window.__ms = {
     // gaming & extras switches are app options (saved by Glassify itself, so they work before the page loads)
     const o = this.opts();
     p.querySelectorAll('input[data-o]').forEach(c => { c.checked = !!o[c.dataset.o]; c.onchange = () => { const n = this.opts(); n[c.dataset.o] = c.checked; this.setOpts(n); }; });
+    // bar position: four edges; and which screen (only shown with more than one)
+    const pills = p.querySelectorAll('.ms-edges .ms-pill');
+    const markEdge = () => { const cur = this.opts().baredge || 'top'; pills.forEach(b => b.classList.toggle('ms-on', b.dataset.e === cur)); };
+    pills.forEach(b => b.onclick = () => { const n = this.opts(); n.baredge = b.dataset.e; this.setOpts(n); markEdge(); });
+    markEdge();
+    const mons = window.__msMonitors || [], monSel = $('.ms-mon');
+    $('.ms-monwrap').style.display = mons.length > 1 ? '' : 'none';
+    if (monSel && mons.length) {
+      const main = mons.find(m => /\(main\)/.test(m.name)) || mons[0];
+      monSel.value = o.barmon && mons.some(m => m.id === o.barmon) ? o.barmon : main.id;
+      monSel.onchange = () => { const n = this.opts(); n.barmon = monSel.value; this.setOpts(n); };
+    }
     $('.ms-ver').innerHTML = 'Glassify ' + (window.__msVersion || '') + (this._update ? ' &middot; <a href=""#"" class=""ms-upd"">' + this._update.tag + ' available</a>' : '');
     const upd = $('.ms-upd'); if (upd) upd.onclick = e => { e.preventDefault(); this.startUpdate(); };
     p.querySelectorAll('.ms-panel button').forEach(b => b.onclick = () => { pick.value = b.dataset.c; update(); });
@@ -447,8 +467,8 @@ const ms = window.__ms = {
     const b = document.getElementById('ms-update');
     if (b) { b.classList.remove('ms-busy'); b.title = 'Automatic update didn\'t work - click to open the download page'; }
   },
-  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false, bar: false, barbottom: false }, window.__msOpts || {}); },
-  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini','bar','barbottom'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',')); },
+  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false, bar: false, baredge: 'top', barmon: '' }, window.__msOpts || {}); },
+  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini','bar'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',') + ',baredge=' + (o.baredge || 'top') + ',barmon=' + String(o.barmon || '').replace(/[,=]/g, '')); },
 
   // ---- for the bar's menu: your library, search, and playing what you pick ----
   // Results land in window.__msLib / window.__msFind ({state:'busy'|'done'|'error', items}); Glassify polls them.
