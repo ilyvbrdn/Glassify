@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Glassify: Spotify, under glass</title>
-<meta name="description" content="A light, floating, glass-styled Windows player for Spotify. A see-through window, a mini player or a bar on the edge of your screen, and out of the way when you game. Free and open source.">
+<meta name="description" content="Spotify on Windows, your way: see-through glass in your own colours, a mini player or a bar on the edge of your screen, and out of the way the moment you start a game. Free and open source.">
 <meta property="og:title" content="Glassify: Spotify, under glass">
-<meta property="og:description" content="A light, floating, glass-styled Windows player for Spotify. Free and open source.">
+<meta property="og:description" content="Spotify on Windows, your way: glass in your colours, a mini player or a bar, and out of the way when you game. Free and open source.">
 <meta property="og:image" content="https://ilyvbrdn.github.io/Glassify/img/look-gradient.jpg">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#0b0a1a">
@@ -169,6 +169,14 @@ section { padding: 110px 0 0; }
 .point b { display: block; font-family: Sora, sans-serif; font-weight: 600; }
 .point span { color: var(--ink-2); font-size: 15px; }
 
+/* why */
+.whys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+.why { padding: 26px; border-radius: 20px; }
+.why .ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: rgba(255,255,255,.1); margin-bottom: 16px; }
+.why b { display: block; font-family: Sora, sans-serif; font-size: 18px; }
+.why span { display: block; margin-top: 8px; color: var(--ink-2); font-size: 15px; }
+@media (max-width: 900px) { .whys { grid-template-columns: 1fr; } }
+
 /* numbers */
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
 .stat { padding: 28px 26px; border-radius: 20px; }
@@ -261,7 +269,7 @@ footer a { color: var(--ink-2); }
   <header class="hero" id="top">
     <span class="eyebrow glass"><b></b>Free &amp; open source · Windows 10 / 11</span>
     <h1>Spotify,<br><em>under glass.</em></h1>
-    <p class="lead">A light, floating player for Spotify on Windows. Your music in a see-through window, a mini player or a bar on the edge of your screen, and out of the way the moment you start a game.</p>
+    <p class="lead">Spotify on Windows, made to look the way you want and to stay out of your way. See-through glass in your own colours, a mini player or a bar on the edge of your screen, and it steps aside the moment you start a game.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/ilyvbrdn/Glassify/releases/latest" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zm0 13l7.5 1v-7H3zm8.5 1.1L21 21v-8.5h-9.5zm0-15.2V11.5H21V3z"/></svg>Download for Windows</a>
@@ -286,6 +294,19 @@ footer a { color: var(--ink-2); }
       <img class="floater" src="img/mini-wide.jpg" alt="The Glassify mini player">
     </div>
   </header>
+
+  <section id="why">
+    <div class="sec-head center reveal">
+      <span class="kicker">Why Glassify</span>
+      <h2>It's still Spotify. Just yours, and out of the way.</h2>
+      <p>Glassify runs Spotify's own web player, so your library, playlists, Premium and everything else work exactly as usual. What changes is how it looks and how it behaves around everything else you do.</p>
+    </div>
+    <div class="whys">
+      <div class="why glass reveal"><div class="ico">🎨</div><b>Make it look like yours</b><span>Spotify's app looks the same for everyone. Glassify puts it under glass in your colours, a gradient, or a calm solid look.</span></div>
+      <div class="why glass reveal"><div class="ico">🪟</div><b>Keep it in reach, not in the way</b><span>Fold it into a small player that floats on top, or a bar on the edge of your screen. Minimize or close it and the music keeps going there.</span></div>
+      <div class="why glass reveal"><div class="ico">🎮</div><b>Built around gaming</b><span>Start a fullscreen game and Glassify hides, drops to low priority and leaves a click-through player. Close the game and it comes back.</span></div>
+    </div>
+  </section>
 
   <section id="looks">
     <div class="split">
@@ -362,9 +383,9 @@ footer a { color: var(--ink-2); }
 
   <section id="light">
     <div class="sec-head center reveal">
-      <span class="kicker">Light on your PC</span>
-      <h2>Quick to open. Quiet in the background.</h2>
-      <p>Glassify runs Spotify's own web player in a minimal shell. When you're not looking at it, it lowers its priority and saves memory.</p>
+      <span class="kicker">In the background</span>
+      <h2>Quick to open. Quiet while you do other things.</h2>
+      <p>When Glassify isn't in front, or a game is running, it drops to low priority so your other apps and games come first. Because it runs Spotify's web player, it uses about as much memory as a browser tab playing Spotify: around 500 MB on our test PC.</p>
     </div>
     <div class="stats">
       <div class="stat glass reveal"><div class="n">~3 s</div><div class="l">from launch to ready, signed in</div></div>

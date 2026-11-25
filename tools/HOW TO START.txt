@@ -1,0 +1,19 @@
+Glassify - Spotify on Windows, your way: glass in your colours, a mini player or a bar, out of the way when you game
+
+1. Keep this whole folder somewhere you can write to (Documents, Downloads, your user folder).
+   Not Program Files: Glassify saves your login and settings in a "data" folder next to Glassify.exe.
+2. Double-click Glassify.exe and sign in to Spotify (Premium needed).
+3. First launch only: if Windows shows "Windows protected your PC", click "More info" -> "Run anyway".
+   (The app isn't code-signed yet.) After that, Glassify updates itself.
+
+Tips
+- Gear button (top right): Look, Player, Gaming and More tabs.
+- Ctrl+Alt+M show/hide the player, Ctrl+Alt+B mini player <-> bar, Ctrl+Alt+G click-through ghost
+  mini player, Ctrl+Alt+L like, Ctrl+Alt+Up/Down volume. Media keys work too.
+- To keep it on your taskbar: Start -> right-click Glassify -> Pin to taskbar.
+- Never share the "data" folder: it holds your Spotify login.
+
+Needs Windows 10 or 11 (with the Microsoft Edge WebView2 Runtime, built into Windows 11).
+Website: https://ilyvbrdn.github.io/Glassify/
+Source and updates: https://github.com/ilyvbrdn/Glassify
+Not affiliated with Spotify.

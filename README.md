@@ -2,7 +2,7 @@
 
 # Glassify
 
-A light, floating, glass-styled Windows player for Spotify. It runs Spotify's own web player (so playback,
+A floating, glass-styled Windows player for Spotify. It runs Spotify's own web player (so playback,
 your library and Premium all work normally) inside a minimal see-through window, with a player you can shrink
 into a floating card or dock to the edge of your screen, and features for listening while gaming.
 
@@ -17,11 +17,18 @@ you can write to (Documents or Downloads, not Program Files) and run `Glassify.e
 **More info → Run anyway** (the app isn't code-signed). After that it updates itself.
 
 ## Why Glassify?
-The official Spotify app for Windows is heavy: it is slow to open, keeps using CPU and memory in the
-background and is hard to keep out of the way while you play games. Glassify is a lighter shell around
-Spotify's own web player. It opens quickly, drops to low priority when you're not looking at it, folds into a
-small always-on-top player or a bar on the edge of your screen, and gets out of the way by itself when a
-fullscreen game starts. And you decide how it looks: see-through glass, solid or light, in any colours.
+It's still Spotify, just yours and out of the way. Glassify runs Spotify's own web player, so your library,
+playlists and Premium work exactly as usual; what changes is how it looks and how it behaves around everything
+else you do:
+- **Make it look like yours.** Spotify's app looks the same for everyone. Glassify puts it under see-through
+  glass in your colours, a gradient, or a calm solid look.
+- **Keep it in reach, not in the way.** Fold it into a small always-on-top player or a bar on the edge of your
+  screen; minimize or close it and the music keeps going there.
+- **Built around gaming.** When a fullscreen game starts, Glassify hides, drops to low priority so the game comes
+  first, and leaves a click-through player. Close the game and it comes back.
+
+It opens in about 3 seconds and stays at low priority while it's in the background. Because it runs Spotify's web
+player, it uses about as much memory as a browser tab playing Spotify (around 500 MB on our test PC).
 
 ## How it looks
 | | |
@@ -45,7 +52,7 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 
 ### Looks and colours (Settings > Look)
 - **Look slider: Glass, Solid, Light.** Glass is the floating see-through style. Solid is a normal opaque
-  window (cheaper to draw). Light is the lightest on CPU and memory: one flat colour, no cover art in lists,
+  window (cheaper to draw). Light is the lightest look: one flat colour, no cover art in lists,
   animations paused, low priority. Every button still works in every look.
 - **Panel colour** from the swatches or any colour you pick, and **transparency** for the glass.
 - **Gradient**: blend the panel colour into a second colour, at any **angle**, with a **balance** slider for
@@ -84,7 +91,8 @@ Screenshots use a demo library; your own playlists are never part of the app or 
   in seconds with your music still playing, and never during a game. Your login and settings are kept. Can be
   switched off; then an update button installs it in one click.
 - **Crash recovery**: if Spotify's page crashes, Glassify reloads it and keeps playing.
-- **Light on your PC**: low priority and memory saver whenever Glassify is minimized or a game is running.
+- **Quiet in the background**: low priority and the browser engine's memory-saver mode whenever Glassify is
+  minimized or a game is running.
 
 ## Shortcuts
 | Keys | Action |
@@ -112,8 +120,8 @@ Your login and settings live in a `data` folder next to the exe. **Never share o
 
 ## Releasing an update
 1. Bump `Version` in `app/Program.cs` and `app/Glassify.csproj`.
-2. Build, then zip a `Glassify` folder holding `Glassify.exe`, its DLLs, the `runtimes` folder and `theme.css`
-   (never `data`).
+2. Build, then zip a `Glassify` folder holding `Glassify.exe`, its DLLs, the `runtimes` folder, `theme.css` and
+   `tools/HOW TO START.txt` (never `data`).
 3. Create a GitHub Release with a higher tag (like `v1.2`) and attach the zip.
 
 Running copies check a few seconds after starting and every 2 hours, then install it automatically (or, with
