@@ -33,9 +33,15 @@ namespace Glassify
             Window?.Close();
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SetProcessDPIAware();
+
         [STAThread]
         static void Main(string[] args)
         {
+            // Set the display-scaling mode before any window exists. Otherwise the mini player's WPF thread sets it
+            // part way through the main window's creation, and the page ends up on a different scale than its window
+            // (laid out 125% too big at 125% scaling: right side and player bar cut off).
+            try { SetProcessDPIAware(); } catch { }
             Directory.CreateDirectory(Data);
             foreach (var a in args)
             {
