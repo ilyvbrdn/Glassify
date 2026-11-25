@@ -129,34 +129,167 @@ namespace Glassify
 
     /// Checks the Glassify GitHub repo's latest release (once at start-up, then daily) and tells the page
     /// when a newer version exists. Sends nothing about you: a plain anonymous request for public release info.
+    /// One-click update: downloads the release zip from this repo only, checks GitHub's SHA-256 fingerprint,
+    /// swaps the program files (never the data folder), and restarts. Any failure puts the old files back.
     static class Updates
     {
         static Timer _timer;
-        public static string LatestTag, LatestUrl;
+        public static string LatestTag, LatestUrl, AssetUrl, AssetSha256;
+        static int _busy;
+        static string Downloads => "https://github.com/" + Program.UpdateRepo + "/releases/download/";
+        // Test hook, only with the data\debug file: read release info from data\update-feed.json instead of GitHub.
+        static string TestFeed => File.Exists(Path.Combine(Program.Data, "debug")) && File.Exists(Path.Combine(Program.Data, "update-feed.json")) ? Path.Combine(Program.Data, "update-feed.json") : null;
+        public static bool CanAutoUpdate => AssetUrl != null && FolderWritable();
 
-        public static void Start() => _timer = new Timer(_ => Check(), null, 20000, 24 * 3600 * 1000);
+        public static void Start() => _timer = new Timer(_ => Check(), null, TestFeed != null ? 3000 : 20000, 24 * 3600 * 1000);
 
         static void Check()
         {
             try
             {
-                ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
-                var req = (HttpWebRequest)WebRequest.Create("https://api.github.com/repos/" + Program.UpdateRepo + "/releases/latest");
-                req.UserAgent = "Glassify-update-check"; req.Accept = "application/vnd.github+json"; req.Timeout = 15000;
                 string body;
-                using (var resp = (HttpWebResponse)req.GetResponse())
-                using (var sr = new StreamReader(resp.GetResponseStream())) body = sr.ReadToEnd();
+                if (TestFeed != null) body = File.ReadAllText(TestFeed);
+                else
+                {
+                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+                    var req = (HttpWebRequest)WebRequest.Create("https://api.github.com/repos/" + Program.UpdateRepo + "/releases/latest");
+                    req.UserAgent = "Glassify-update-check"; req.Accept = "application/vnd.github+json"; req.Timeout = 15000;
+                    using (var resp = (HttpWebResponse)req.GetResponse())
+                    using (var sr = new StreamReader(resp.GetResponseStream())) body = sr.ReadToEnd();
+                }
                 var o = Program.Json.DeserializeObject(body);
                 var tag = Program.Str(o, "tag_name"); var url = Program.Str(o, "html_url");
                 if (tag == null || url == null || !url.StartsWith("https://github.com/" + Program.UpdateRepo + "/")) return;
-                if (Newer(tag, Program.Version))
-                {
-                    LatestTag = tag; LatestUrl = url;
-                    Program.Window?.ShowUpdate(tag, url);
-                }
+                if (!Newer(tag, Program.Version)) return;
+                // the release's zip: must come from this repo's own release downloads (or the local test feed)
+                string asset = null, sha = null;
+                if (o is System.Collections.Generic.Dictionary<string, object> d && d.TryGetValue("assets", out var a) && a is System.Collections.IEnumerable list)
+                    foreach (var item in list)
+                    {
+                        var name = Program.Str(item, "name"); var dl = Program.Str(item, "browser_download_url");
+                        if (name == null || dl == null || !name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (!(dl.StartsWith(Downloads) || (TestFeed != null && dl.StartsWith("file:///")))) continue;
+                        asset = dl;
+                        var digest = Program.Str(item, "digest");
+                        if (digest != null && digest.StartsWith("sha256:")) sha = digest.Substring(7);
+                        break;
+                    }
+                LatestTag = tag; LatestUrl = url; AssetUrl = asset; AssetSha256 = sha;
+                Program.Window?.ShowUpdate(tag, url, CanAutoUpdate);
             }
             catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { /* no releases yet */ }
             catch (Exception ex) { Program.Log("update check: " + ex.Message); }
+        }
+
+        /// Can Glassify replace its own files here? (Not if someone put it in Program Files.)
+        static bool FolderWritable()
+        {
+            try { var t = Path.Combine(Program.Home, ".write-test"); File.WriteAllText(t, ""); File.Delete(t); return true; }
+            catch { return false; }
+        }
+
+        /// The update button was clicked: download, verify, swap the files, restart. Runs off the UI thread.
+        public static void Apply()
+        {
+            if (Interlocked.Exchange(ref _busy, 1) == 1) return;
+            var work = Path.Combine(Program.Data, "update");
+            var swapped = new System.Collections.Generic.List<(string target, string old)>();
+            try
+            {
+                if (AssetUrl == null || !FolderWritable()) throw new InvalidOperationException("can't update in this folder");
+                Program.Log("updating to " + LatestTag);
+                if (Directory.Exists(work)) Directory.Delete(work, true);
+                Directory.CreateDirectory(work);
+                var zip = Path.Combine(work, "update.zip");
+                Download(AssetUrl, zip);
+                if (AssetSha256 != null && !string.Equals(Sha256(zip), AssetSha256, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("the download didn't match GitHub's fingerprint");
+                var unpacked = Path.Combine(work, "files");
+                System.IO.Compression.ZipFile.ExtractToDirectory(zip, unpacked);
+                // the zip holds a "Glassify" folder (or the files directly)
+                var src = File.Exists(Path.Combine(unpacked, "Glassify.exe")) ? unpacked
+                        : Array.Find(Directory.GetDirectories(unpacked), x => File.Exists(Path.Combine(x, "Glassify.exe")));
+                if (src == null) throw new InvalidDataException("the download has no Glassify.exe");
+
+                // Windows lets a running program's files be renamed (not overwritten): move each old file aside as
+                // *.old, put the new one in its place. The *.old files are deleted on the next start.
+                foreach (var file in Directory.GetFiles(src, "*", SearchOption.AllDirectories))
+                {
+                    var rel = file.Substring(src.Length).TrimStart('\\');
+                    if (rel.StartsWith("data\\", StringComparison.OrdinalIgnoreCase) || rel.Contains("..")) continue;   // never touch your login/settings
+                    var target = Path.Combine(Program.Home, rel);
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    string old = null;
+                    if (File.Exists(target))
+                    {
+                        old = target + ".old";
+                        if (File.Exists(old)) File.Delete(old);
+                        File.Move(target, old);
+                    }
+                    swapped.Add((target, old));
+                    File.Copy(file, target);
+                }
+                Program.Log("updated to " + LatestTag + ", restarting");
+                try { Directory.Delete(work, true); } catch { }
+                var w = Program.Window;
+                w?.BeginInvoke(new Action(async () =>
+                {
+                    // keep the music going across the restart
+                    try { await w.Eval("(()=>{const p=document.querySelector('[data-testid=control-button-playpause]'); if(p&&/pause/i.test(p.getAttribute('aria-label')||'')) localStorage.setItem('ms-resume',String(Date.now())); return ''})()"); } catch { }
+                    Program.Restart();
+                }));
+            }
+            catch (Exception ex)
+            {
+                Program.Log("update failed: " + ex.Message);
+                // put every swapped file back the way it was
+                for (int i = swapped.Count - 1; i >= 0; i--)
+                {
+                    var (target, old) = swapped[i];
+                    try { if (File.Exists(target)) File.Delete(target); if (old != null) File.Move(old, target); } catch (Exception e2) { Program.Log("rollback: " + e2.Message); }
+                }
+                try { Directory.Delete(work, true); } catch { }
+                Interlocked.Exchange(ref _busy, 0);
+                Program.Window?.UpdateFailed(LatestUrl);
+            }
+        }
+
+        /// On start-up: remove the old files left by the last update.
+        public static void Cleanup()
+        {
+            try
+            {
+                DeleteOld(Program.Home);
+                var work = Path.Combine(Program.Data, "update");
+                if (Directory.Exists(work)) Directory.Delete(work, true);
+            }
+            catch { }
+        }
+        // program folders only: the data folder (your login; the browser keeps its own *.old files there) is skipped
+        static void DeleteOld(string dir)
+        {
+            foreach (var f in Directory.GetFiles(dir, "*.old")) try { File.Delete(f); } catch { }
+            foreach (var d in Directory.GetDirectories(dir))
+                if (!string.Equals(d.TrimEnd('\\'), Program.Data.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) DeleteOld(d);
+        }
+
+        static void Download(string url, string to)
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+            var req = WebRequest.Create(url);   // GitHub redirects to its download servers; that's followed automatically
+            req.Timeout = 60000;
+            if (req is HttpWebRequest h) { h.UserAgent = "Glassify-updater"; h.ReadWriteTimeout = 60000; }
+            using (var resp = req.GetResponse())
+            using (var s = resp.GetResponseStream())
+            using (var f = File.Create(to)) s.CopyTo(f);
+            if (new FileInfo(to).Length < 10000) throw new InvalidDataException("the download is too small");
+        }
+
+        static string Sha256(string path)
+        {
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+            using (var f = File.OpenRead(path))
+                return BitConverter.ToString(sha.ComputeHash(f)).Replace("-", "");
         }
 
         static bool Newer(string tag, string current)

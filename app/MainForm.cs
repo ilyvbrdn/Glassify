@@ -91,7 +91,7 @@ namespace Glassify
                            ",toast:" + B(Opts.Toast) + ",auto:" + B(Opts.AutoStart) + ",startmini:" + B(Opts.StartMini) + "};";
                 try { await core.ExecuteScriptAsync(init); } catch { }
                 try { await core.ExecuteScriptAsync(_js); } catch { }
-                if (Updates.LatestTag != null) ShowUpdate(Updates.LatestTag, Updates.LatestUrl);
+                if (Updates.LatestTag != null) ShowUpdate(Updates.LatestTag, Updates.LatestUrl, Updates.CanAutoUpdate);
             };
             // Crash recovery: if Spotify's page crashes or freezes, reload it (your song resumes);
             // if the whole browser engine dies, restart Glassify.
@@ -155,16 +155,18 @@ namespace Glassify
         public void RefreshPower() => ApplyPower();
         static string B(bool b) => b ? "true" : "false";
 
-        public void ShowUpdate(string tag, string url)
+        public void ShowUpdate(string tag, string url, bool auto) => Run("window.__ms && window.__ms.showUpdate(" + Program.Json.Serialize(tag) + "," + Program.Json.Serialize(url) + "," + B(auto) + ")");
+
+        /// One-click update didn't work: say so on the button and open the download page instead.
+        public void UpdateFailed(string url)
         {
-            try
-            {
-                BeginInvoke(new Action(async () =>
-                {
-                    try { await _web.CoreWebView2.ExecuteScriptAsync("window.__ms && window.__ms.showUpdate(" + Program.Json.Serialize(tag) + "," + Program.Json.Serialize(url) + ")"); } catch { }
-                }));
-            }
-            catch { }
+            Run("window.__ms && window.__ms.updateFailed && window.__ms.updateFailed()");
+            if (url != null && url.StartsWith("https://github.com/" + Program.UpdateRepo + "/")) try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
+        }
+
+        void Run(string js)
+        {
+            try { BeginInvoke(new Action(async () => { try { await _web.CoreWebView2.ExecuteScriptAsync(js); } catch { } })); } catch { }
         }
 
         void OnMessage(string msg)
@@ -187,6 +189,7 @@ namespace Glassify
                 return;
             }
             if (msg == "restart") { Program.Restart(); return; }
+            if (msg == "update") { System.Threading.ThreadPool.QueueUserWorkItem(_ => Updates.Apply()); return; }
             if (msg.StartsWith("opts:")) { Opts.Apply(msg.Substring(5)); return; }
             if (msg.StartsWith("track:"))
             {

@@ -39,7 +39,8 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 - **Ghost mini player**: see-through and click-through while gaming (Ctrl+Alt+G any time).
 - **Song-change popup** (optional), **start with Windows** (optional, can start straight into the mini player).
 - **Crash recovery**: if Spotify's page crashes it reloads and keeps playing.
-- **Update check**: looks at this repo's latest GitHub Release once a day.
+- **One-click updates**: checks this repo's latest GitHub Release once a day; one click installs it and
+  restarts, keeping your login, settings and music.
 
 ## Shortcuts
 | Keys | Action |
@@ -65,9 +66,16 @@ sheet for checking every size, which isn't committed).
 Your login and settings live in a `data` folder next to the exe. **Never share or commit `data`.**
 
 ## Releasing an update
-1. Bump `Version` in `app/Program.cs`.
-2. Build, zip `Glassify.exe`, its DLLs and `theme.css` (not `data`).
-3. Create a GitHub Release with a tag like `v1.3.0` and attach the zip. Running copies will show an update button.
+1. Bump `Version` in `app/Program.cs` and `app/Glassify.csproj`.
+2. Build, then zip a `Glassify` folder holding `Glassify.exe`, its DLLs, the `runtimes` folder and `theme.css`
+   (never `data`).
+3. Create a GitHub Release with a higher tag (like `v1.1.0`) and attach the zip.
+
+Running copies check once a day and show an update button (top right). One click downloads the zip from this
+repo's releases, checks it against GitHub's SHA-256 fingerprint, swaps the program files (the `data` folder with
+the login and settings is never touched) and restarts with the music still playing. If anything goes wrong it
+puts the old files back and opens the release page instead. If Glassify can't write to its own folder (for
+example under Program Files) the button just opens the release page.
 
 ## Notes
 Not affiliated with Spotify. Uses Spotify's official web player unmodified (no ad blocking, no downloading,

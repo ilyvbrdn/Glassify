@@ -37,6 +37,8 @@ const BASE=`
 #ms-settings .ms-ver { min-height: 0; margin-bottom: 8px; }
 #ms-settings .ms-ver a { color: var(--ms-accent, #ff5fa8); }
 #ms-winctl #ms-update { color: var(--ms-accent, #ff5fa8); }
+#ms-winctl #ms-update.ms-busy { animation: ms-pulse 1s ease-in-out infinite !important; animation-play-state: running !important; cursor: progress; }
+@keyframes ms-pulse { 50% { opacity: .3; } }
 #ms-settings .ms-row { display: flex; justify-content: flex-end; gap: 8px; }
 #ms-settings .ms-row button { border: 0; border-radius: 999px; padding: 6px 14px; cursor: pointer; font: inherit; background: rgba(255,255,255,.1); color: #eee; }
 #ms-settings .ms-row .ms-done { background: var(--ms-accent, #ff5fa8); color: var(--ms-accent-ink, #1a0710); font-weight: 600; }
@@ -284,7 +286,7 @@ const ms = window.__ms = {
     const o = this.opts();
     p.querySelectorAll('input[data-o]').forEach(c => { c.checked = !!o[c.dataset.o]; c.onchange = () => { const n = this.opts(); n[c.dataset.o] = c.checked; this.setOpts(n); }; });
     $('.ms-ver').innerHTML = 'Glassify ' + (window.__msVersion || '') + (this._update ? ' &middot; <a href=""#"" class=""ms-upd"">' + this._update.tag + ' available</a>' : '');
-    const upd = $('.ms-upd'); if (upd) upd.onclick = e => { e.preventDefault(); post('open:' + this._update.url); };
+    const upd = $('.ms-upd'); if (upd) upd.onclick = e => { e.preventDefault(); this.startUpdate(); };
     p.querySelectorAll('.ms-panel button').forEach(b => b.onclick = () => { pick.value = b.dataset.c; update(); });
     p.querySelectorAll('.ms-accent button').forEach(b => b.onclick = () => { apick.value = b.dataset.c; update(); });
     pick.oninput = update; apick.oninput = update; range.oninput = update;
@@ -355,14 +357,29 @@ const ms = window.__ms = {
     if (key && this._track !== undefined && key !== this._track) post('track:' + JSON.stringify({ t: md.title, a: md.artist, art: this.art() }));
     if (key) this._track = key;
   },
-  showUpdate(tag, url) {
-    this._update = { tag, url };
+  showUpdate(tag, url, auto) {
+    this._update = { tag, url, auto: !!auto };
     const w = document.getElementById('ms-winctl');
     if (!w || document.getElementById('ms-update')) return;
     const b = document.createElement('button');
-    b.id = 'ms-update'; b.title = 'Glassify ' + tag + ' is available - click to open the download page';
-    b.innerHTML = '&#xE896;'; b.onclick = () => post('open:' + url);
+    b.id = 'ms-update';
+    b.title = auto ? 'Glassify ' + tag + ' is available - click to update (a few seconds, your music keeps playing)'
+                   : 'Glassify ' + tag + ' is available - click to open the download page';
+    b.innerHTML = '&#xE896;'; b.onclick = () => this.startUpdate();
     w.insertBefore(b, w.children[1]);
+  },
+  // one click: Glassify downloads, checks and installs the update, then restarts itself
+  startUpdate() {
+    const u = this._update; if (!u) return;
+    if (!u.auto) { post('open:' + u.url); return; }
+    const b = document.getElementById('ms-update');
+    if (b) { if (b.classList.contains('ms-busy')) return; b.classList.add('ms-busy'); b.title = 'Updating Glassify to ' + u.tag + '...'; }
+    post('update');
+  },
+  updateFailed() {
+    if (this._update) this._update.auto = false;   // next click opens the download page
+    const b = document.getElementById('ms-update');
+    if (b) { b.classList.remove('ms-busy'); b.title = 'Automatic update didn\'t work - click to open the download page'; }
   },
   opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false }, window.__msOpts || {}); },
   setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',')); }

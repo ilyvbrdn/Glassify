@@ -10,7 +10,7 @@ namespace Glassify
 {
     static class Program
     {
-        public const string Version = "1.2.0";
+        public const string Version = "1.0.0";
         public const string UpdateRepo = "ilyvbrdn/Glassify";
 
         public static readonly string Home = AppDomain.CurrentDomain.BaseDirectory;
@@ -50,6 +50,7 @@ namespace Glassify
                 AppDomain.CurrentDomain.UnhandledException += (s, e) => Log("crash: " + e.ExceptionObject);
                 System.Windows.Forms.Application.ThreadException += (s, e) => Log("ui: " + e.Exception);
                 System.Windows.Forms.Application.EnableVisualStyles();
+                Updates.Cleanup();   // old files left by a one-click update
                 Opts.Load();
                 Window = new MainForm();
                 Mini.Init();
@@ -88,8 +89,8 @@ namespace Glassify
         //   Ctrl+Alt+M mini player   Ctrl+Alt+G ghost mini player   Ctrl+Alt+L like song
         //   Ctrl+Alt+Up / Down volume   media keys play/pause, next, previous
         public static readonly string[] HotkeyHelp = {
-            "Ctrl+Alt+M · mini player", "Ctrl+Alt+G · ghost mini player (click-through)", "Ctrl+Alt+L · like song",
-            "Ctrl+Alt+↑ / ↓ · volume", "Media keys · play/pause, next, previous" };
+            "Ctrl+Alt+M Â· mini player", "Ctrl+Alt+G Â· ghost mini player (click-through)", "Ctrl+Alt+L Â· like song",
+            "Ctrl+Alt+â†‘ / â†“ Â· volume", "Media keys Â· play/pause, next, previous" };
         static void StartHotkeys()
         {
             var t = new Thread(() =>
