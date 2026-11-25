@@ -272,8 +272,11 @@ const ms = window.__ms = {
       '<label class=""ms-check""><input type=""checkbox"" data-o=""toast""><span><b>Song-change popup</b><br>A small popup with the cover when the song changes (when Glassify isn\'t in front)</span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""auto""><span><b>Start with Windows</b></span></label>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
+      '<div class=""ms-h"">Bar</div>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Show the bar</b><br>A thin player docked to the edge of your screen, with your playlists and search (Ctrl+Alt+B)</span></label>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""barbottom""><span><b>Bar at the bottom</b><br>Dock it to the bottom of the screen instead of the top</span></label>' +
       '<div class=""ms-h"">Shortcuts</div>' +
-      '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
+      '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
       '<div class=""ms-desc ms-ver""></div>' +
       '<div class=""ms-note""></div>' +
       '<div class=""ms-row""><button class=""ms-reset"">Reset</button><button class=""ms-done"">Done</button></div>';
@@ -423,8 +426,92 @@ const ms = window.__ms = {
     const b = document.getElementById('ms-update');
     if (b) { b.classList.remove('ms-busy'); b.title = 'Automatic update didn\'t work - click to open the download page'; }
   },
-  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false }, window.__msOpts || {}); },
-  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',')); }
+  opts() { return Object.assign({ game: true, ghost: true, toast: false, auto: false, startmini: false, bar: false, barbottom: false }, window.__msOpts || {}); },
+  setOpts(o) { window.__msOpts = o; post('opts:' + ['game','ghost','toast','auto','startmini','bar','barbottom'].map(k => k + '=' + (o[k] ? 1 : 0)).join(',')); },
+
+  // ---- for the bar's menu: your library, search, and playing what you pick ----
+  // Results land in window.__msLib / window.__msFind ({state:'busy'|'done'|'error', items}); Glassify polls them.
+  wait(ms) { return new Promise(r => setTimeout(r, ms)); },
+  go(path) { if (location.pathname !== path) { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); } },
+  // Your Library list (playlists, albums, artists, Liked Songs). The list only draws the rows on screen, so scroll
+  // through it once to collect every entry, then put the scroll position back.
+  library() {
+    if (this._libBusy) return 'busy';
+    this._libBusy = true; window.__msLib = { state: 'busy' };
+    (async () => {
+      const out = new Map();
+      const grab = () => document.querySelectorAll('#Desktop_LeftSidebar_Id [role=row]').forEach(r => {
+        const t = r.querySelector('[id^=""listrow-title-""]'); if (!t) return;
+        const uri = t.id.replace('listrow-title-', '');
+        if (out.has(uri) || !/^spotify:(playlist|album|artist|show|collection)/.test(uri)) return;
+        const sub = r.querySelector('[id^=""listrow-subtitle-""]'), img = r.querySelector('img');
+        out.set(uri, { uri, name: t.textContent.trim(), sub: sub ? sub.textContent.trim() : '', img: img ? (img.currentSrc || img.src || '') : '' });
+      });
+      grab();
+      let sc = document.querySelector('#Desktop_LeftSidebar_Id [role=row]');
+      while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      if (sc) {
+        const keep = sc.scrollTop;
+        for (let y = 0, n = 0; y < sc.scrollHeight && n < 60; y += Math.max(200, sc.clientHeight * 0.8), n++) { sc.scrollTop = y; await this.wait(120); grab(); }
+        sc.scrollTop = keep;
+      }
+      window.__msLib = { state: 'done', items: [...out.values()] };
+    })().catch(e => { window.__msLib = { state: 'error', error: String(e) }; }).finally(() => { this._libBusy = false; });
+    return 'started';
+  },
+  // Play something from your library: open its page and press its play button (the one named after it).
+  playUri(uri, name) {
+    const m = /^spotify:(playlist|album|artist|show):([A-Za-z0-9]+)$/.exec(uri || '');
+    const path = uri === 'spotify:collection:tracks' ? '/collection/tracks' : m ? '/' + m[1] + '/' + m[2] : null;
+    if (!path) return 'unsupported';
+    const id = this._playId = (this._playId || 0) + 1;
+    (async () => {
+      this.go(path);
+      const want = (name || '').toLowerCase();
+      for (let i = 0; i < 50 && this._playId === id; i++) {
+        await this.wait(150);
+        const b = document.querySelector('#main-view [data-testid=action-bar-row] [data-testid=play-button]');
+        if (!b || location.pathname !== path) continue;
+        const label = (b.getAttribute('aria-label') || '').toLowerCase();
+        if (want && !label.includes(want) && i < 25) continue;   // still the previous page's button
+        if (!/pause/.test(label)) b.click();
+        return;
+      }
+    })();
+    return 'ok';
+  },
+  // Search songs: open Spotify's song results for the words and read the first rows.
+  search(q) {
+    const id = this._findId = (this._findId || 0) + 1;
+    window.__msFind = { state: 'busy', q };
+    (async () => {
+      const rowSel = '#main-view [data-testid=tracklist-row]';
+      const before = (document.querySelector(rowSel) || {}).textContent || '';
+      const path = '/search/' + encodeURIComponent(q) + '/tracks';
+      this.go(path);
+      let rows = [];
+      for (let i = 0; i < 50 && this._findId === id; i++) {
+        await this.wait(150);
+        rows = [...document.querySelectorAll(rowSel)];
+        if (rows.length && (rows[0].textContent !== before || i > 20)) break;
+      }
+      if (this._findId !== id) return;
+      const items = rows.slice(0, 40).map((r, i) => {
+        const t = r.querySelector('a[data-testid=internal-track-link]') || r.querySelector('[aria-colindex=""2""] .encore-internal-color-text-base');
+        const artists = [...r.querySelectorAll('a[href^=""/artist/""]')].map(a => a.textContent.trim()).filter(Boolean);
+        const img = r.querySelector('img');
+        return { i, name: t ? t.textContent.trim() : '', sub: [...new Set(artists)].join(', '), img: img ? (img.currentSrc || img.src || '') : '' };
+      }).filter(x => x.name);
+      window.__msFind = { state: 'done', q, items };
+    })().catch(e => { window.__msFind = { state: 'error', error: String(e) }; });
+    return 'started';
+  },
+  playFound(i) {
+    const r = document.querySelectorAll('#main-view [data-testid=tracklist-row]')[i];
+    if (!r) return 'gone';
+    r.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    return 'ok';
+  }
 };
 // The script can run before the page exists, so every step is guarded and the upkeep timer is always set.
 const safe = () => { try { if (document.documentElement) ms.apply(); } catch (e) { window.__msErr = String(e && e.stack || e); } };

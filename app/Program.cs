@@ -54,6 +54,7 @@ namespace Glassify
                 Opts.Load();
                 Window = new MainForm();
                 Mini.Init();
+                Bar.Sync();          // bar was on last time: bring it back
                 StartHotkeys();
                 GameMode.Start();
                 System.Windows.Forms.Application.Run(Window);
@@ -99,7 +100,7 @@ namespace Glassify
                 var keys = new (int id, uint mods, uint vk, string name)[] {
                     (1, CA, 0x4D, "Ctrl+Alt+M"), (2, 0x4000, 0xB3, "Play/Pause"), (3, 0x4000, 0xB0, "Next"), (4, 0x4000, 0xB1, "Previous"),
                     (5, 0x0001 | 0x0002, 0x26, "Ctrl+Alt+Up"), (6, 0x0001 | 0x0002, 0x28, "Ctrl+Alt+Down"),
-                    (7, CA, 0x4C, "Ctrl+Alt+L"), (8, CA, 0x47, "Ctrl+Alt+G") };
+                    (7, CA, 0x4C, "Ctrl+Alt+L"), (8, CA, 0x47, "Ctrl+Alt+G"), (9, CA, 0x42, "Ctrl+Alt+B") };
                 foreach (var k in keys)
                 {
                     // retry briefly: a previous Glassify may still be releasing its keys while it shuts down
@@ -120,6 +121,7 @@ namespace Glassify
                         case 6: _ = Eval("window.__ms && __ms.volume(-0.1)"); break;
                         case 7: _ = Eval("window.__ms && __ms.like()"); break;
                         case 8: Mini.ToggleGhost(); break;
+                        case 9: Bar.Toggle(); break;
                     }
                 }
             }) { IsBackground = true, Name = "Hotkeys" };
@@ -137,7 +139,7 @@ namespace Glassify
     /// App options set from the settings panel, saved so they work before the page loads (start-up, game mode).
     static class Opts
     {
-        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false;
+        public static volatile bool GameMode = true, Ghost = true, Toast = false, AutoStart = false, StartMini = false, Bar = false, BarBottom = false;
         static string FilePath => Path.Combine(Program.Data, "opts.txt");
         public static void Load()
         {
@@ -147,14 +149,18 @@ namespace Glassify
                 {
                     var p = line.Split('='); if (p.Length != 2) continue;
                     bool v = p[1].Trim() == "1";
-                    switch (p[0].Trim()) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; }
+                    Set(p[0].Trim(), v);
                 }
             }
             catch { }
         }
+        static void Set(string k, bool v)
+        {
+            switch (k) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; case "bar": Bar = v; break; case "barbottom": BarBottom = v; break; }
+        }
         public static void Save()
         {
-            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\n"); } catch { }
+            try { File.WriteAllText(FilePath, $"game={B(GameMode)}\r\nghost={B(Ghost)}\r\ntoast={B(Toast)}\r\nauto={B(AutoStart)}\r\nstartmini={B(StartMini)}\r\nbar={B(Bar)}\r\nbarbottom={B(BarBottom)}\r\n"); } catch { }
         }
         static string B(bool b) => b ? "1" : "0";
         /// From the page: "opts:game=1,ghost=1,toast=0,auto=0,startmini=0"
@@ -163,12 +169,12 @@ namespace Glassify
             foreach (var kv in s.Split(','))
             {
                 var p = kv.Split('='); if (p.Length != 2) continue;
-                bool v = p[1] == "1";
-                switch (p[0]) { case "game": GameMode = v; break; case "ghost": Ghost = v; break; case "toast": Toast = v; break; case "auto": AutoStart = v; break; case "startmini": StartMini = v; break; }
+                Set(p[0], p[1] == "1");
             }
             Save();
             SetAutoStart(AutoStart);
             if (!GameMode || !Ghost) Mini.SetGhost(false, auto: true);
+            Glassify.Bar.Sync();
         }
 
         /// Start with Windows: a normal per-user startup entry (no admin, removable from Task Manager > Startup apps).

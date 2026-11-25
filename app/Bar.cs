@@ -1,0 +1,460 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shell;
+using System.Windows.Threading;
+
+namespace Glassify
+{
+    /// The bar: a thin glass player docked to the top or bottom edge of the main screen (gear menu > Bar, or
+    /// Ctrl+Alt+B). It registers with Windows like the taskbar does, so other windows make room for it instead of
+    /// sliding underneath, and it steps aside for fullscreen games. Its menu lists your library and searches songs.
+    static class Bar
+    {
+        static BarWindow _w;
+
+        /// Show or hide the bar to match the settings (and move it if top/bottom changed).
+        public static void Sync() => Run(w => { if (Opts.Bar) w.ShowBar(Opts.BarBottom); else w.HideBar(); });
+
+        /// Ctrl+Alt+B / the mini player's bar button.
+        public static void Toggle()
+        {
+            Opts.Bar = !Opts.Bar;
+            Opts.Save();
+            _ = Program.Eval("window.__msOpts && (window.__msOpts.bar = " + (Opts.Bar ? "true" : "false") + ")");
+            Sync();
+        }
+
+        public static void CloseNow() { try { _w?.HideBar(); _w?.Close(); } catch { } }
+
+        static void Run(Action<BarWindow> a)
+        {
+            var d = Mini.Disp; if (d == null) return;
+            d.BeginInvoke(new Action(() =>
+            {
+                try { if (_w == null) _w = new BarWindow(); a(_w); }
+                catch (Exception ex) { Program.Log("bar: " + ex); }
+            }));
+        }
+    }
+
+    class BarWindow : Window
+    {
+        const double BarHeight = 48;
+        const string Icons = "Segoe Fluent Icons, Segoe MDL2 Assets";
+        readonly Image _art = new Image { Stretch = Stretch.UniformToFill, Width = 34, Height = 34 };
+        readonly TextBlock _title = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly TextBlock _artist = new TextBlock { FontSize = 11.5, Foreground = new SolidColorBrush(Color.FromArgb(0xB8, 255, 255, 255)), TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly TextBlock _pos = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0xB0, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Width = 40, TextAlignment = TextAlignment.Right };
+        readonly TextBlock _dur = new TextBlock { FontSize = 11, Foreground = new SolidColorBrush(Color.FromArgb(0xB0, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Width = 40 };
+        readonly Border _fill = new Border { Height = 3, CornerRadius = new CornerRadius(1.5), Background = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Width = 0 };
+        readonly Grid _seek = new Grid { Height = 16, Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = "Click to jump", Margin = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        readonly Grid _root;
+        readonly Button _play, _like, _menuBtn;
+        readonly DispatcherTimer _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        string _artUrl; double _posS, _durS; bool _playing, _liked; DateTime _at = DateTime.UtcNow;
+        bool _bottom, _registered, _fullscreenApp;
+        IntPtr _hwnd;
+
+        // menu
+        readonly Popup _popup;
+        readonly TextBox _search = new TextBox { FontSize = 13, Background = Brushes.Transparent, Foreground = Brushes.White, BorderThickness = new Thickness(0), CaretBrush = Brushes.White, VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(6, 0, 6, 0) };
+        readonly TextBlock _hint = new TextBlock { Text = "Search songs, press Enter", FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(0x80, 255, 255, 255)), IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(9, 0, 0, 0) };
+        readonly TextBlock _listHead = new TextBlock { FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromArgb(0xC8, 255, 255, 255)), Margin = new Thickness(14, 10, 14, 6) };
+        readonly StackPanel _list = new StackPanel();
+        readonly Border _menuCard;
+        List<Dictionary<string, object>> _library;
+        DateTime _libraryAt;
+
+        public BarWindow()
+        {
+            Title = "Glassify bar";
+            WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            Topmost = true; ShowInTaskbar = false; ShowActivated = false;
+            Background = Brushes.Transparent; Height = BarHeight; Width = 800;
+            FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
+            UseLayoutRounding = true;
+            WindowChrome.SetWindowChrome(this, new WindowChrome { GlassFrameThickness = new Thickness(-1), CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), UseAeroCaptionButtons = false });
+
+            _root = new Grid { Background = new SolidColorBrush(Color.FromArgb(0x70, 0x20, 0x10, 0x1C)) };
+            var dock = new DockPanel { LastChildFill = true, Margin = new Thickness(8, 0, 8, 0) };
+
+            // left: menu, cover, song
+            _menuBtn = Btn("", 14, 36, ToggleMenu, "Your library and search");
+            DockPanel.SetDock(_menuBtn, Dock.Left); dock.Children.Add(_menuBtn);
+            var artBox = new Border { Width = 34, Height = 34, CornerRadius = new CornerRadius(6), Margin = new Thickness(6, 0, 10, 0), Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), Child = _art, Cursor = Cursors.Hand, ToolTip = "Open Glassify", VerticalAlignment = VerticalAlignment.Center };
+            _art.Clip = new RectangleGeometry(new Rect(0, 0, 34, 34), 6, 6);
+            artBox.MouseLeftButtonUp += (s, e) => Program.FocusExisting();
+            DockPanel.SetDock(artBox, Dock.Left); dock.Children.Add(artBox);
+            var song = new StackPanel { Width = 260, VerticalAlignment = VerticalAlignment.Center };
+            _title.Text = "Glassify"; _artist.Text = "Nothing playing";
+            song.Children.Add(_title); song.Children.Add(_artist);
+            DockPanel.SetDock(song, Dock.Left); dock.Children.Add(song);
+
+            // controls
+            var ctl = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 6, 0) };
+            ctl.Children.Add(Btn("", 13, 32, () => Click("control-button-skip-back"), "Previous"));
+            _play = Btn("", 14, 34, () => { _playing = !_playing; UpdatePlay(); Click("control-button-playpause"); }, "Play/pause", true);
+            ctl.Children.Add(_play);
+            ctl.Children.Add(Btn("", 13, 32, () => Click("control-button-skip-forward"), "Next"));
+            DockPanel.SetDock(ctl, Dock.Left); dock.Children.Add(ctl);
+
+            // right: like, mini player, open main, close
+            var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _like = Btn("", 12, 30, async () =>
+            {
+                if (_liked) { Program.FocusExisting(); return; }
+                _liked = true; UpdateLike();
+                try { await Program.Eval("window.__ms && window.__ms.like()"); } catch { }
+                await Task.Delay(600); await Refresh();
+            }, "Like (save to Liked Songs)");
+            right.Children.Add(_like);
+            right.Children.Add(Btn("", 12, 30, () => Program.FocusExisting(), "Open the main player"));
+            right.Children.Add(Btn("", 11, 30, () => Bar.Toggle(), "Hide the bar (Ctrl+Alt+B)"));
+            DockPanel.SetDock(right, Dock.Right); dock.Children.Add(right);
+
+            // middle: time - progress - time (fills the rest)
+            var mid = new DockPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0) };
+            DockPanel.SetDock(_pos, Dock.Left); mid.Children.Add(_pos);
+            DockPanel.SetDock(_dur, Dock.Right); mid.Children.Add(_dur);
+            _seek.Children.Add(new Border { Height = 3, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(1.5), Background = new SolidColorBrush(Color.FromArgb(0x38, 255, 255, 255)) });
+            _seek.Children.Add(_fill);
+            _seek.MouseLeftButtonDown += async (s, e) =>
+            {
+                double frac = Math.Max(0, Math.Min(1, e.GetPosition(_seek).X / Math.Max(1, _seek.ActualWidth)));
+                if (_durS > 0) { _posS = frac * _durS; _at = DateTime.UtcNow; Draw(); }
+                try { await Program.Eval("window.__ms && window.__ms.seek(" + frac.ToString(CultureInfo.InvariantCulture) + ")"); } catch { }
+                await Task.Delay(400); await Refresh();
+            };
+            mid.Children.Add(_seek);
+            dock.Children.Add(mid);
+
+            _root.Children.Add(dock);
+            _root.MouseWheel += async (s, e) => { try { await Program.Eval("window.__ms && window.__ms.volume(" + (e.Delta > 0 ? "0.05" : "-0.05") + ")"); } catch { } };
+            Content = _root;
+
+            // ---- the menu: search box, then your library or the search results ----
+            var searchRow = new Grid { Height = 36, Margin = new Thickness(10, 10, 10, 2) };
+            searchRow.Children.Add(new Border { CornerRadius = new CornerRadius(18), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)) });
+            var sIcon = new TextBlock { Text = "", FontFamily = new FontFamily(Icons), FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(0xB0, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(13, 0, 0, 0), IsHitTestVisible = false };
+            var sBox = new Grid { Margin = new Thickness(30, 0, 12, 0) };
+            sBox.Children.Add(_hint); sBox.Children.Add(_search);
+            searchRow.Children.Add(sIcon); searchRow.Children.Add(sBox);
+            _search.TextChanged += (s, e) => { _hint.Visibility = _search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; if (_search.Text.Length == 0) ShowLibrary(); };
+            _search.KeyDown += (s, e) => { if (e.Key == Key.Enter && _search.Text.Trim().Length > 0) { e.Handled = true; _ = DoSearch(_search.Text.Trim()); } else if (e.Key == Key.Escape) _popup.IsOpen = false; };
+            var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = _list, Margin = new Thickness(0, 0, 0, 8) };
+            var menu = new DockPanel();
+            DockPanel.SetDock(searchRow, Dock.Top); menu.Children.Add(searchRow);
+            DockPanel.SetDock(_listHead, Dock.Top); menu.Children.Add(_listHead);
+            menu.Children.Add(scroll);
+            // (the popup inherits its font from the menu button, which uses the icon font, so set the text font here)
+            System.Windows.Documents.TextElement.SetFontFamily(menu, new FontFamily("Segoe UI Variable Text, Segoe UI"));
+            _menuCard = new Border { Width = 380, Height = 480, CornerRadius = new CornerRadius(14), Background = new SolidColorBrush(Color.FromRgb(0x1C, 0x16, 0x20)), BorderBrush = new SolidColorBrush(Color.FromArgb(0x30, 255, 255, 255)), BorderThickness = new Thickness(1), Child = menu };
+            _popup = new Popup { PlacementTarget = _menuBtn, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, Child = _menuCard, VerticalOffset = 8, PopupAnimation = PopupAnimation.None };
+
+            SourceInitialized += (s, e) =>
+            {
+                _hwnd = new WindowInteropHelper(this).Handle;
+                HwndSource.FromHwnd(_hwnd).CompositionTarget.BackgroundColor = Colors.Transparent;
+                int v = 1; DwmSetWindowAttribute(_hwnd, 20, ref v, 4);   // dark
+                v = 3; DwmSetWindowAttribute(_hwnd, 38, ref v, 4);       // acrylic glass
+                v = 1; DwmSetWindowAttribute(_hwnd, 33, ref v, 4);       // square corners: it's a screen edge
+                SetWindowLong(_hwnd, -20, GetWindowLong(_hwnd, -20) | 0x80);   // no Alt+Tab entry
+                HwndSource.FromHwnd(_hwnd).AddHook(Hook);
+            };
+            _timer.Tick += async (s, e) => await Refresh();
+            _seek.SizeChanged += (s, e) => Draw();
+            Closed += (s, e) => Unregister();
+        }
+
+        // ---------- docking (an "app bar", like the taskbar) ----------
+        public void ShowBar(bool bottom)
+        {
+            bool moved = bottom != _bottom; _bottom = bottom;
+            _popup.Placement = bottom ? PlacementMode.Top : PlacementMode.Bottom;
+            _popup.VerticalOffset = bottom ? -8 : 8;
+            if (!IsVisible) { Show(); _timer.Start(); _ = Refresh(); }
+            if (moved && _registered) Unregister();
+            DockToEdge();
+        }
+
+        public void HideBar()
+        {
+            _popup.IsOpen = false;
+            if (!IsVisible) return;
+            Unregister();
+            _timer.Stop();
+            Hide();
+        }
+
+        void DockToEdge()
+        {
+            if (_hwnd == IntPtr.Zero) return;
+            var abd = NewData();
+            if (!_registered) { abd.uCallbackMessage = WM_APPBAR; SHAppBarMessage(0 /*ABM_NEW*/, ref abd); _registered = true; }
+            // the main screen, measured by this thread in the same units SetWindowPos and the shell use here
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            GetMonitorInfo(MonitorFromPoint(new POINT(), 1 /*MONITOR_DEFAULTTOPRIMARY*/), ref mi);
+            var scr = mi.rcMonitor;
+            double dpi = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1;
+            int h = (int)Math.Round(BarHeight * dpi);
+            abd.uEdge = _bottom ? 3u /*ABE_BOTTOM*/ : 1u /*ABE_TOP*/;
+            abd.rc = new RECT { L = scr.L, R = scr.R, T = _bottom ? scr.B - h : scr.T, B = _bottom ? scr.B : scr.T + h };
+            SHAppBarMessage(2 /*ABM_QUERYPOS*/, ref abd);           // Windows moves it clear of the taskbar etc.
+            if (_bottom) abd.rc.T = abd.rc.B - h; else abd.rc.B = abd.rc.T + h;
+            SHAppBarMessage(3 /*ABM_SETPOS*/, ref abd);             // reserve the space
+            SetWindowPos(_hwnd, _fullscreenApp ? HWND_NOTOPMOST : HWND_TOPMOST, abd.rc.L, abd.rc.T, abd.rc.R - abd.rc.L, abd.rc.B - abd.rc.T, 0x0010 /*NOACTIVATE*/);
+        }
+
+        void Unregister()
+        {
+            if (!_registered || _hwnd == IntPtr.Zero) return;
+            var abd = NewData();
+            SHAppBarMessage(1 /*ABM_REMOVE*/, ref abd);
+            _registered = false;
+        }
+
+        APPBARDATA NewData() => new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), hWnd = _hwnd };
+
+        IntPtr Hook(IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool handled)
+        {
+            if (msg == WM_APPBAR)
+            {
+                switch (w.ToInt32())
+                {
+                    case 1: /*ABN_POSCHANGED*/ if (_registered) DockToEdge(); break;
+                    case 2: /*ABN_FULLSCREENAPP: a fullscreen app (a game) opened or closed - step aside for it */
+                        _fullscreenApp = l != IntPtr.Zero;
+                        SetWindowPos(_hwnd, _fullscreenApp ? HWND_BOTTOM : HWND_TOPMOST, 0, 0, 0, 0, 0x0013 /*NOSIZE|NOMOVE|NOACTIVATE*/);
+                        if (_fullscreenApp) _popup.IsOpen = false;
+                        break;
+                }
+            }
+            else if (msg == 0x0006 /*WM_ACTIVATE*/ && _registered) { var abd = NewData(); SHAppBarMessage(6 /*ABM_ACTIVATE*/, ref abd); }
+            else if (msg == 0x0047 /*WM_WINDOWPOSCHANGED*/ && _registered) { var abd = NewData(); SHAppBarMessage(9 /*ABM_WINDOWPOSCHANGED*/, ref abd); }
+            return IntPtr.Zero;
+        }
+
+        // ---------- the menu ----------
+        void ToggleMenu()
+        {
+            if (_popup.IsOpen) { _popup.IsOpen = false; return; }
+            _popup.IsOpen = true;
+            Activate();                       // so you can type in the search box
+            // focus the search box with its old text selected, so typing starts a new search
+            Dispatcher.BeginInvoke(new Action(() => { _search.Focus(); Keyboard.Focus(_search); _search.SelectAll(); }), DispatcherPriority.Input);
+            if (_search.Text.Trim().Length == 0) ShowLibrary();
+        }
+
+        async void ShowLibrary()
+        {
+            _listHead.Text = "Your Library";
+            if (_library != null) Fill(_library, false);
+            if (_library != null && (DateTime.UtcNow - _libraryAt).TotalSeconds < 60) return;
+            if (_library == null) Message("Loading your library...");
+            var r = await Poll("window.__ms && __ms.library()", "JSON.stringify(window.__msLib || null)", 20000);
+            if (_search.Text.Trim().Length > 0) return;   // you started a search meanwhile
+            if (r == null) { if (_library == null) Message("Couldn't load your library. Open Glassify and sign in, then try again."); return; }
+            _library = r; _libraryAt = DateTime.UtcNow;
+            if (_library.Count == 0) Message("Your library is empty."); else Fill(_library, false);
+        }
+
+        async Task DoSearch(string q)
+        {
+            _listHead.Text = "Songs for \"" + q + "\"";
+            Message("Searching...");
+            var r = await Poll("window.__ms && __ms.search(" + Program.Json.Serialize(q) + ")", "JSON.stringify(window.__msFind || null)", 12000);
+            if (_search.Text.Trim() != q) return;
+            if (r == null) { Message("Search didn't work. Check your connection and try again."); return; }
+            if (r.Count == 0) Message("No songs found."); else Fill(r, true);
+        }
+
+        /// Start something in the page, then check its result every 200 ms.
+        async Task<List<Dictionary<string, object>>> Poll(string start, string read, int timeoutMs)
+        {
+            try
+            {
+                await Program.Eval(start);
+                var until = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+                while (DateTime.UtcNow < until)
+                {
+                    await Task.Delay(200);
+                    var json = await Program.Eval(read);
+                    if (string.IsNullOrEmpty(json) || json == "null") continue;
+                    if (!(Program.Json.DeserializeObject(json) is Dictionary<string, object> st)) continue;
+                    var state = Program.Str(st, "state");
+                    if (state == "error") { Program.Log("bar menu: " + Program.Str(st, "error")); return null; }
+                    if (state != "done") continue;
+                    var list = new List<Dictionary<string, object>>();
+                    if (st.TryGetValue("items", out var it) && it is System.Collections.IEnumerable e)
+                        foreach (var x in e) if (x is Dictionary<string, object> d) list.Add(d);
+                    return list;
+                }
+            }
+            catch (Exception ex) { Program.Log("bar menu: " + ex.Message); }
+            return null;
+        }
+
+        void Message(string text)
+        {
+            _list.Children.Clear();
+            _list.Children.Add(new TextBlock { Text = text, Foreground = new SolidColorBrush(Color.FromArgb(0xB0, 255, 255, 255)), Margin = new Thickness(14, 6, 14, 6), TextWrapping = TextWrapping.Wrap, FontSize = 12.5 });
+        }
+
+        void Fill(List<Dictionary<string, object>> items, bool songs)
+        {
+            _list.Children.Clear();
+            foreach (var it in items)
+            {
+                var name = Program.Str(it, "name") ?? ""; var sub = Program.Str(it, "sub") ?? ""; var img = Program.Str(it, "img");
+                var row = new Grid { Height = 52, Background = Brushes.Transparent, Cursor = Cursors.Hand };
+                var hover = new Border { CornerRadius = new CornerRadius(8), Margin = new Thickness(6, 1, 6, 1), Background = Brushes.Transparent };
+                row.Children.Add(hover);
+                var g = new Grid { Margin = new Thickness(14, 0, 14, 0) };
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+                g.ColumnDefinitions.Add(new ColumnDefinition());
+                var pic = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(songs ? 4 : 6), Background = new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center };
+                if (!string.IsNullOrEmpty(img) && img.StartsWith("https://"))
+                    try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(img); bi.DecodePixelWidth = 80; bi.EndInit(); var im = new Image { Source = bi, Stretch = Stretch.UniformToFill }; im.Clip = new RectangleGeometry(new Rect(0, 0, 40, 40), songs ? 4 : 6, songs ? 4 : 6); pic.Child = im; } catch { }
+                g.Children.Add(pic);
+                var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+                text.Children.Add(new TextBlock { Text = name, Foreground = Brushes.White, FontSize = 13, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis });
+                if (sub.Length > 0) text.Children.Add(new TextBlock { Text = sub, Foreground = new SolidColorBrush(Color.FromArgb(0xA8, 255, 255, 255)), FontSize = 11.5, TextTrimming = TextTrimming.CharacterEllipsis });
+                Grid.SetColumn(text, 1); g.Children.Add(text);
+                row.Children.Add(g);
+                row.MouseEnter += (s, e) => hover.Background = new SolidColorBrush(Color.FromArgb(0x1E, 255, 255, 255));
+                row.MouseLeave += (s, e) => hover.Background = Brushes.Transparent;
+                var item = it;
+                row.MouseLeftButtonUp += async (s, e) =>
+                {
+                    _popup.IsOpen = false;
+                    _title.Text = name; _artist.Text = songs ? sub : "Starting...";
+                    if (songs) await Program.Eval("window.__ms && __ms.playFound(" + Convert.ToString(item.TryGetValue("i", out var i) ? i : 0, CultureInfo.InvariantCulture) + ")");
+                    else await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(Program.Str(item, "uri")) + "," + Program.Json.Serialize(name) + ")");
+                    await Task.Delay(1500); await Refresh();
+                };
+                _list.Children.Add(row);
+            }
+        }
+
+        // ---------- now playing ----------
+        bool _busy;
+        async Task Refresh()
+        {
+            if (_busy) { Draw(); return; }
+            _busy = true;
+            try
+            {
+                var json = await Program.Eval("window.__ms ? window.__ms.state() : ''");
+                if (!string.IsNullOrEmpty(json) && Program.Json.DeserializeObject(json) is Dictionary<string, object> st)
+                {
+                    var t = Program.Str(st, "t"); if (!string.IsNullOrEmpty(t)) { _title.Text = t; _artist.Text = Program.Str(st, "a"); }
+                    _playing = st.TryGetValue("playing", out var p) && p is bool pb && pb; UpdatePlay();
+                    _liked = st.TryGetValue("liked", out var lk) && lk is bool lb && lb; UpdateLike();
+                    var art = Program.Str(st, "art");
+                    if (!string.IsNullOrEmpty(art) && art != _artUrl)
+                    {
+                        _artUrl = art;
+                        try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 80; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
+                    }
+                    Colours(Program.Str(st, "color"), Program.Str(st, "accent"), Program.Str(st, "alpha"));
+                    var dur = Secs(Program.Str(st, "dur")); if (dur > 0) { _durS = dur; _posS = Secs(Program.Str(st, "pos")); _at = DateTime.UtcNow; }
+                }
+            }
+            catch { }
+            finally { _busy = false; }
+            Draw();
+        }
+
+        void Draw()
+        {
+            var pos = _posS + (_playing ? (DateTime.UtcNow - _at).TotalSeconds : 0);
+            if (_durS > 0) pos = Math.Min(pos, _durS);
+            _pos.Text = _durS > 0 ? Time(pos) : ""; _dur.Text = _durS > 0 ? Time(_durS) : "";
+            _fill.Width = _durS > 0 && _seek.ActualWidth > 0 ? Math.Max(0, Math.Min(1, pos / _durS)) * _seek.ActualWidth : 0;
+        }
+        static string Time(double s) { var t = TimeSpan.FromSeconds(Math.Max(0, s)); return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss"); }
+
+        string _lookKey;
+        void Colours(string panel, string accent, string alpha)
+        {
+            if (panel == null || accent == null) return;
+            var key = panel + accent + alpha; if (key == _lookKey) return; _lookKey = key;
+            try
+            {
+                double a = 82; double.TryParse(alpha, NumberStyles.Any, CultureInfo.InvariantCulture, out a);
+                var pc = (Color)ColorConverter.ConvertFromString(panel); var ac = (Color)ColorConverter.ConvertFromString(accent);
+                byte a1 = (byte)Math.Max(0x40, Math.Min(0xF0, a * 2.2));
+                _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb((byte)(a1 / 2), pc.R, pc.G, pc.B), 0);
+                _menuCard.Background = new SolidColorBrush(Color.FromRgb((byte)(pc.R * .45 + 14), (byte)(pc.G * .45 + 12), (byte)(pc.B * .45 + 16)));
+                _play.Background = new SolidColorBrush(ac);
+                _play.Foreground = (0.299 * ac.R + 0.587 * ac.G + 0.114 * ac.B) / 255 > .55 ? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)) : Brushes.White;
+                _fill.Background = new SolidColorBrush(ac);
+            }
+            catch { }
+        }
+
+        void UpdatePlay() => _play.Content = _playing ? "" : "";
+        void UpdateLike() { _like.Content = _liked ? "" : ""; _like.ToolTip = _liked ? "In your Liked Songs (click to open Glassify)" : "Like (save to Liked Songs)"; }
+
+        async void Click(string testId)
+        {
+            try { await Program.Eval("window.__ms && window.__ms.click('" + testId + "')"); } catch { }
+            await Task.Delay(350); await Refresh();
+        }
+
+        static double Secs(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return 0;
+            double total = 0;
+            foreach (var part in s.Trim().Split(':')) { if (!double.TryParse(part, NumberStyles.Any, CultureInfo.InvariantCulture, out var v)) return 0; total = total * 60 + v; }
+            return total;
+        }
+
+        Button Btn(string glyph, double size, double box, Action onClick, string tip, bool filled = false)
+        {
+            var b = new Button { Content = glyph, FontFamily = new FontFamily(Icons), FontSize = size, Width = box, Height = box, ToolTip = tip, Focusable = false, Cursor = Cursors.Hand,
+                Foreground = filled ? new SolidColorBrush(Color.FromRgb(0x10, 0x10, 0x14)) : Brushes.White, Margin = new Thickness(2, 0, 2, 0), VerticalAlignment = VerticalAlignment.Center };
+            var tpl = new ControlTemplate(typeof(Button));
+            var bd = new FrameworkElementFactory(typeof(Border), "B");
+            bd.SetValue(Border.CornerRadiusProperty, new CornerRadius(box / 2));
+            if (filled) { b.Background = new SolidColorBrush(Color.FromArgb(0xF2, 255, 255, 255)); bd.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty)); }
+            else bd.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
+            cp.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cp.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+            bd.AppendChild(cp);
+            tpl.VisualTree = bd;
+            var hover = new Trigger { Property = IsMouseOverProperty, Value = true };
+            if (filled) hover.Setters.Add(new Setter(OpacityProperty, 0.85, "B"));
+            else hover.Setters.Add(new Setter(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x26, 255, 255, 255)), "B"));
+            tpl.Triggers.Add(hover);
+            b.Template = tpl;
+            b.Click += (s, e) => onClick();
+            return b;
+        }
+
+        const int WM_APPBAR = 0x8000 + 0x4742;   // WM_APP + 'GB'
+        static readonly IntPtr HWND_TOPMOST = new IntPtr(-1), HWND_NOTOPMOST = new IntPtr(-2), HWND_BOTTOM = new IntPtr(1);
+        [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)] struct MONITORINFO { public int cbSize; public RECT rcMonitor, rcWork; public uint dwFlags; }
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(POINT p, uint flags);
+        [DllImport("user32.dll")] static extern bool GetMonitorInfo(IntPtr mon, ref MONITORINFO mi);
+        [StructLayout(LayoutKind.Sequential)] struct APPBARDATA { public int cbSize; public IntPtr hWnd; public uint uCallbackMessage; public uint uEdge; public RECT rc; public IntPtr lParam; }
+        [DllImport("shell32.dll")] static extern UIntPtr SHAppBarMessage(uint msg, ref APPBARDATA data);
+        [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+        [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
+        [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
+    }
+}

@@ -71,7 +71,10 @@ namespace Glassify
             }));
         }
 
-        public static void Close() { try { _disp?.BeginInvoke(new Action(() => { _win?.Close(); _toast?.Close(); })); } catch { } }
+        public static void Close() { try { _disp?.BeginInvoke(new Action(() => { _win?.Close(); _toast?.Close(); Bar.CloseNow(); })); } catch { } }
+
+        /// The mini player's UI thread, shared by the bar (null until it's ready).
+        public static Dispatcher Disp => _ready.Wait(5000) ? _disp : null;
 
         public static volatile bool IsShown;
         public static void HideOnly()
@@ -158,7 +161,8 @@ namespace Glassify
         public void ShowOver(Window mini, string title, string artist, ImageSource art, Brush accent)
         {
             Left = mini.Left; Top = mini.Top; Width = mini.Width; Height = mini.Height;
-            _root.LayoutTransform = new ScaleTransform(mini.Width / 372, mini.Height / 108);
+            var s = Math.Max(0.45, Math.Min(mini.Width / 372, mini.Height / 108));
+            _root.LayoutTransform = new ScaleTransform(s, s);
             _t.Text = title; _a.Text = artist; _art.Source = art; if (accent != null) _fill.Background = accent;
             Show();
             _timer.Start(); _ = Refresh();
@@ -264,29 +268,30 @@ namespace Glassify
         public MiniWindow()
         {
             Title = "Glassify mini player";
-            Width = 372; Height = 108;
-            WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            Width = 372; Height = 108; MinWidth = 180; MinHeight = 60;
+            // drag any edge or corner to resize it, to any size
+            WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.CanResize;
             Topmost = true; ShowInTaskbar = false; ShowActivated = false;
             Background = Brushes.Transparent;
             FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
             UseLayoutRounding = true;
-            WindowChrome.SetWindowChrome(this, new WindowChrome { GlassFrameThickness = new Thickness(-1), CaptionHeight = 0, ResizeBorderThickness = new Thickness(0), UseAeroCaptionButtons = false });
+            WindowChrome.SetWindowChrome(this, new WindowChrome { GlassFrameThickness = new Thickness(-1), CaptionHeight = 0, ResizeBorderThickness = new Thickness(7), UseAeroCaptionButtons = false });
 
             var root = _root = new Grid { Background = new LinearGradientBrush(Color.FromArgb(0x66, 0xFF, 0x5F, 0xA8), Color.FromArgb(0x14, 0x60, 0x2C, 0x4E), 35) };
             var sheen = new Border { BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
                 BorderBrush = new LinearGradientBrush(Color.FromArgb(0x70, 255, 190, 225), Color.FromArgb(0x14, 255, 150, 205), 90), IsHitTestVisible = false };
-            var content = new Grid { Margin = new Thickness(12) };
+            var content = _content = new Grid { Margin = new Thickness(12), VerticalAlignment = VerticalAlignment.Center };
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(84) });
             content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var artBox = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), Cursor = Cursors.Hand, ToolTip = "Open Glassify" };
+            var artBox = _artBox = new Border { Width = 84, Height = 84, CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromArgb(0x22, 255, 255, 255)), Cursor = Cursors.Hand, ToolTip = "Open Glassify" };
             _art.Clip = new RectangleGeometry(new Rect(0, 0, 84, 84), 12, 12);
             artBox.Child = _art;
             // Handle the click on press, before the window's drag-to-move grabs the mouse and swallows it.
             artBox.MouseLeftButtonDown += (s, e) => { e.Handled = true; Program.FocusExisting(); };
             content.Children.Add(artBox);
 
-            var right = new Grid { Margin = new Thickness(14, 2, 0, 0) };
+            var right = _right = new Grid { Margin = new Thickness(14, 2, 0, 0) };
             right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             right.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -323,7 +328,7 @@ namespace Glassify
                 await Task.Delay(600); await Refresh();
             }, "Like (save to Liked Songs)");
             extras.Children.Add(_like);
-            extras.Children.Add(IconButton("", 12, 28, CycleSize, "Size: small / medium / large"));
+            extras.Children.Add(IconButton("", 12, 28, () => Bar.Toggle(), "Switch to the bar (Ctrl+Alt+B)"));
             extras.Children.Add(IconButton("", 12, 28, () => Program.FocusExisting(), "Open the main player"));
             Grid.SetRow(extras, 3);
 
@@ -339,6 +344,9 @@ namespace Glassify
             root.MouseEnter += (s, e) => close.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(150)));
             root.MouseLeave += (s, e) => close.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(250)));
             root.MouseLeftButtonDown += (s, e) => { try { DragMove(); SavePos(); } catch { } };
+            // resizing: re-flow the layout as it changes, remember the size once you let go
+            SizeChanged += (s, e) => { Relayout(); _saveSoon.Stop(); _saveSoon.Start(); };
+            _saveSoon.Tick += (s, e) => { _saveSoon.Stop(); if (IsVisible) SavePos(); };
             // mouse wheel anywhere on the mini player = volume
             root.MouseWheel += async (s, e) =>
             {
@@ -397,23 +405,43 @@ namespace Glassify
             _like.ToolTip = _liked ? "In your Liked Songs (click to open Glassify)" : "Like (save to Liked Songs)";
         }
 
-        // ---- size: small / medium / large, remembered ----
-        Grid _root;
-        double _scale = 1;
-        static readonly double[] Sizes = { 0.8, 1.0, 1.3 };
-        void ApplyScale()
+        // ---- free size: drag any edge/corner. The design scales smoothly with the window:
+        //   wide  -> cover on the left, longer title (the original 372 x 108 design, scaled by height)
+        //   tall  -> big cover on top, song + controls underneath (a 260-wide design, scaled by width)
+        Grid _root, _content, _right;
+        Border _artBox;
+        bool? _vertical;
+        readonly DispatcherTimer _saveSoon = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        public double Scale { get; private set; } = 1;
+        void Relayout()
         {
-            _root.LayoutTransform = new ScaleTransform(_scale, _scale);
-            Width = Math.Round(372 * _scale); Height = Math.Round(108 * _scale);
-        }
-        void CycleSize()
-        {
-            int i = Array.IndexOf(Sizes, _scale);
-            _scale = Sizes[(i + 1) % Sizes.Length];
-            double right = Left + Width, bottom = Top + Height;   // grow/shrink from the bottom-right corner
-            ApplyScale();
-            Left = right - Width; Top = bottom - Height;
-            SavePos();
+            double w = ActualWidth, h = ActualHeight;
+            if (w < 20 || h < 20 || _content == null) return;
+            bool vertical = h > w * 0.9;
+            if (vertical != _vertical)
+            {
+                _vertical = vertical;
+                _content.ColumnDefinitions.Clear(); _content.RowDefinitions.Clear();
+                double art = vertical ? 236 : 84;
+                _artBox.Width = _artBox.Height = art;
+                _art.Clip = new RectangleGeometry(new Rect(0, 0, art, art), 12, 12);
+                if (vertical)
+                {
+                    _content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    _content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    Grid.SetColumn(_right, 0); Grid.SetRow(_right, 1);
+                    _right.Margin = new Thickness(2, 12, 2, 4); _right.MinHeight = 96;
+                }
+                else
+                {
+                    _content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(84) });
+                    _content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    Grid.SetColumn(_right, 1); Grid.SetRow(_right, 0);
+                    _right.Margin = new Thickness(14, 2, 0, 0); _right.MinHeight = 84;
+                }
+            }
+            Scale = Math.Max(0.45, vertical ? Math.Min(w / 260, h / 384) : Math.Min(h / 108, w / 372));
+            _root.LayoutTransform = new ScaleTransform(Scale, Scale);
         }
 
         void ApplColoursSafe(string pc, string ac, string alpha)
@@ -446,8 +474,15 @@ namespace Glassify
         public void ShowMini()
         {
             var wa = SystemParameters.WorkArea;
-            try { var sp = File.ReadAllText(PosFile).Split(','); if (sp.Length > 2) { var s = double.Parse(sp[2], CultureInfo.InvariantCulture); if (Array.IndexOf(Sizes, s) >= 0) _scale = s; } } catch { }
-            ApplyScale();
+            // remembered size: "x,y,width,height" (older copies saved "x,y,scale")
+            try
+            {
+                var sp = File.ReadAllText(PosFile).Split(',');
+                if (sp.Length >= 4) { Width = Math.Max(MinWidth, double.Parse(sp[2], CultureInfo.InvariantCulture)); Height = Math.Max(MinHeight, double.Parse(sp[3], CultureInfo.InvariantCulture)); }
+                else if (sp.Length == 3) { var s = double.Parse(sp[2], CultureInfo.InvariantCulture); if (s > 0.3 && s < 4) { Width = Math.Round(372 * s); Height = Math.Round(108 * s); } }
+            }
+            catch { }
+            Width = Math.Min(Width, wa.Width); Height = Math.Min(Height, wa.Height);
             Left = wa.Right - Width - 16; Top = wa.Bottom - Height - 16;
             try
             {
@@ -473,7 +508,11 @@ namespace Glassify
         [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
         [DllImport("user32.dll")] static extern IntPtr MonitorFromRect(ref RECT r, uint flags);
 
-        void SavePos() { try { File.WriteAllText(PosFile, string.Join(",", Left.ToString(CultureInfo.InvariantCulture), Top.ToString(CultureInfo.InvariantCulture), _scale.ToString(CultureInfo.InvariantCulture))); } catch { } }
+        void SavePos()
+        {
+            string F(double d) => Math.Round(d, 1).ToString(CultureInfo.InvariantCulture);
+            try { File.WriteAllText(PosFile, string.Join(",", F(Left), F(Top), F(Width), F(Height))); } catch { }
+        }
 
         Button IconButton(string glyph, double size, double box, Action onClick, string tip, bool filled = false)
         {
@@ -527,7 +566,7 @@ namespace Glassify
                     if (!string.IsNullOrEmpty(art) && art != _artUrl)
                     {
                         _artUrl = art;
-                        try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 168; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
+                        try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 512; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
                     }
                     var pc = Program.Str(st, "color"); var ac = Program.Str(st, "accent");
                     if (pc != null && ac != null) ApplColoursSafe(pc, ac, Program.Str(st, "alpha"));
