@@ -1,0 +1,89 @@
+/* Glassify floating theme — built for speed:
+   no :has(), no "every element inside" rules, no live blurs, no big shadows.
+   Colours come from the gear menu: --ms-rgb / --ms-alpha (panels) and --ms-accent (highlights). */
+
+/* instant hover: Spotify fades highlights in over 0.15-0.2 s; make every hover/press change immediate */
+*, *::before, *::after { transition-duration: 0s !important; transition-delay: 0s !important; }
+
+/* see-through window: page background and the wrappers around the panels (tagged by Glassify) */
+html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-nav-bar"], .LayoutResizer__resize-bar {
+  background: transparent !important; }
+
+/* window dragging is done by Glassify from the empty part of the top bar (no drag regions, so scrolling/clicks are never intercepted) */
+
+/* the floating panels: one solid colour + transparency */
+#Desktop_LeftSidebar_Id > nav, #main-view, #Desktop_PanelContainer_Id, [data-testid="now-playing-bar"] {
+  background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha, .82)) !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
+  border-radius: 22px !important; }
+[data-testid="now-playing-bar"] { margin: 0 8px 8px !important; }
+
+/* Spotify's own solid layers inside the panels (tagged once by Glassify) and the page-colour header band */
+[data-ms-clear], #main-view [style*="background-color"] { background-color: transparent !important; background-image: none !important; }
+/* closed 'Now playing' panel: Spotify keeps it full width inside a thin strip; hide what peeks out */
+[aria-hidden="true"] > div > #Desktop_PanelContainer_Id { visibility: hidden !important; }
+
+/* top bar */
+[data-testid="global-nav-bar"] { padding-right: 168px !important; }
+[data-testid="global-nav-bar"] form, [data-testid="home-button"], [data-testid="user-widget-link"] {
+  background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94)) !important;
+  border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }
+[data-testid="search-input"] { background: transparent !important; }
+
+/* highlight colour instead of Spotify green */
+:root, .encore-dark-theme, .encore-dark-theme .encore-base-set {
+  --text-bright-accent: var(--ms-accent, #ff5fa8) !important; --essential-bright-accent: var(--ms-accent, #ff5fa8) !important;
+  --text-positive: var(--ms-accent, #ff5fa8) !important; --essential-positive: var(--ms-accent, #ff5fa8) !important; }
+.encore-bright-accent-set {
+  --background-base: var(--ms-accent, #ff5fa8) !important; --background-highlight: var(--ms-accent-hi, #ff7ab8) !important;
+  --background-press: var(--ms-accent, #ff5fa8) !important; --background-elevated-base: var(--ms-accent, #ff5fa8) !important;
+  --text-base: var(--ms-accent-ink, #1a0710) !important; --essential-base: var(--ms-accent-ink, #1a0710) !important; }
+
+/* popups and menus */
+#context-menu, [role="dialog"], .tippy-box { background: rgb(var(--ms-rgb-dark, 28,20,30)) !important; border-radius: 14px !important; }
+
+/* light panel colours get dark text */
+html.ms-light [data-testid="root"] { --text-base: #141414 !important; --text-subdued: #4a4a4a !important; --essential-base: #141414 !important;
+  --essential-subdued: #5f5f5f !important; --decorative-subdued: rgba(0,0,0,.15) !important;
+  --background-highlight: rgba(0,0,0,.07) !important; --background-press: rgba(0,0,0,.12) !important;
+  --background-elevated-base: rgba(0,0,0,.08) !important; --background-elevated-highlight: rgba(0,0,0,.12) !important; --background-elevated-press: rgba(0,0,0,.16) !important;
+  --background-tinted-base: rgba(0,0,0,.06) !important; --background-tinted-highlight: rgba(0,0,0,.1) !important; --background-tinted-press: rgba(0,0,0,.14) !important;
+  color: #141414; }
+/* a few Spotify parts hard-code white: song titles, the library's icon buttons, the player bar's side buttons */
+html.ms-light #main-view [data-testid="tracklist-row"] .encore-internal-color-text-base { color: #141414; }
+html.ms-light #Desktop_LeftSidebar_Id button:not([aria-checked="true"]),
+html.ms-light [data-testid="now-playing-bar"] button:not([data-testid="control-button-playpause"]):not([aria-checked="true"]):not(#ms-mini-btn) { color: #3c3c3c; }
+html.ms-light #ms-mini-btn { color: #3c3c3c; border-color: rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
+/* ...except a page header drawn over a big photo: white text there */
+html.ms-light #main-view[data-ms-photo] [data-testid="entity-header"] { --text-base: #fff !important; --text-subdued: rgba(255,255,255,.85) !important; --essential-base: #fff !important; color: #fff; }
+
+/* less clutter */
+[data-testid="whats-new-feed-button"], a[href*="/download"], [data-testid="upgrade-button"], [data-testid="left-sidebar-footer"] { display: none !important; }
+/* Spotify's own mini player button (Glassify's glass mini player replaces it) */
+[data-testid="pip-toggle-button"] { display: none !important; }
+
+/* ===== Solid look (levels 3-1): a normal window, flat panels, nothing see-through or glassy ===== */
+html.ms-solid, html.ms-solid body { background: rgb(var(--ms-rgb-dark, 28,20,30)) !important; }
+html.ms-solid #Desktop_LeftSidebar_Id > nav, html.ms-solid #main-view, html.ms-solid #Desktop_PanelContainer_Id,
+html.ms-solid [data-testid="now-playing-bar"] {
+  background: rgb(var(--ms-rgb, 90,36,72)) !important; border: 0 !important; box-shadow: none !important; border-radius: 8px !important; }
+html.ms-solid [data-testid="global-nav-bar"] form, html.ms-solid [data-testid="home-button"], html.ms-solid [data-testid="user-widget-link"] {
+  background: rgb(var(--ms-rgb, 90,36,72)) !important; border: 0 !important; }
+html.ms-solid #ms-mini-btn { box-shadow: none; }
+
+/* invisible resize edges */
+#ms-edges .ms-e { position: fixed; z-index: 2147483647; }
+#ms-edges .ms-l { left: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+#ms-edges .ms-r { right: 0; top: 10px; bottom: 10px; width: 5px; cursor: ew-resize; }
+#ms-edges .ms-t { top: 0; left: 10px; right: 10px; height: 4px; cursor: ns-resize; }
+#ms-edges .ms-b { bottom: 0; left: 10px; right: 10px; height: 5px; cursor: ns-resize; }
+#ms-edges .ms-tl { top: 0; left: 0; width: 10px; height: 10px; cursor: nwse-resize; }
+#ms-edges .ms-br { bottom: 0; right: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+#ms-edges .ms-tr { top: 0; right: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+#ms-edges .ms-bl { bottom: 0; left: 0; width: 10px; height: 10px; cursor: nesw-resize; }
+
+/* mini-player button (in the player bar) */
+#ms-mini-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08); color: #fff; cursor: pointer; display: inline-grid; place-items: center; margin: 0 4px; padding: 0; }
+#ms-mini-btn:hover { background: rgba(255,255,255,.2); }

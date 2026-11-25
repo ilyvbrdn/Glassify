@@ -1,0 +1,8 @@
+# build output
+build/
+app/bin/
+app/obj/
+# personal data: login, settings, cache (never commit)
+data/
+*.log
+archive/
