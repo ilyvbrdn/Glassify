@@ -50,6 +50,7 @@ namespace Glassify
                 e.Cancel = true;
                 if (_shuttingDown) return;
                 _shuttingDown = true;
+                try { if (_tray != null) { _tray.Visible = false; _tray.Dispose(); } } catch { }
                 SaveBounds();
                 Hide();
                 Mini.Close();
@@ -239,6 +240,35 @@ namespace Glassify
             bool lowMem = Eco || MemLevel <= 2 || away;
             SetPriority(lowCpu ? ProcessPriorityClass.BelowNormal : ProcessPriorityClass.Normal);
             try { _web.CoreWebView2.MemoryUsageTargetLevel = lowMem ? CoreWebView2MemoryUsageTargetLevel.Low : CoreWebView2MemoryUsageTargetLevel.Normal; } catch { }
+            UpdateTray();
+        }
+
+        // While the main window is hidden (minimized to the mini player, game mode, started in the mini player) there's no
+        // taskbar button, so a tray icon by the clock shows Glassify is still running: click to open, right-click for more.
+        NotifyIcon _tray;
+        void UpdateTray()
+        {
+            bool want = !Visible && !_shuttingDown;
+            if (want && _tray == null)
+            {
+                var menu = new ContextMenuStrip();
+                menu.Items.Add("Open Glassify", null, (s, e) => BringBack());
+                menu.Items.Add("Show / hide mini player", null, (s, e) => Mini.Toggle());
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add("Quit Glassify", null, (s, e) => Close());
+                _tray = new NotifyIcon { Icon = Icon, Text = "Glassify (click to open)", ContextMenuStrip = menu };
+                _tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) BringBack(); };
+                _tray.BalloonTipClicked += (s, e) => BringBack();
+            }
+            if (_tray == null || _tray.Visible == want) return;
+            _tray.Visible = want;
+            // the first time ever, say where Glassify went
+            var flag = Path.Combine(Program.Data, "tray-tip.txt");
+            if (want && !File.Exists(flag))
+            {
+                try { File.WriteAllText(flag, "shown"); } catch { }
+                _tray.ShowBalloonTip(6000, "Glassify is still running", "It's in the mini player and here by the clock. Click this icon to open Glassify, or right-click to quit.", ToolTipIcon.None);
+            }
         }
 
         // "Minimize to mini player": hide the main window completely and show only the mini player.

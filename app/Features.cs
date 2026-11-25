@@ -102,7 +102,9 @@ namespace Glassify
         }
         static readonly string[] NotGames = { "chrome", "msedge", "firefox", "opera", "opera_gx", "brave", "vivaldi", "arc",
             "vlc", "mpc-hc64", "mpc-hc", "mpc-be64", "potplayermini64", "mpv", "wmplayer", "video.ui", "applicationframehost",
-            "microsoft.media.player", "netflix", "powerpnt", "explorer", "msedgewebview2" };
+            "microsoft.media.player", "netflix", "powerpnt", "explorer", "msedgewebview2",
+            // screenshot / screen-recording overlays cover the whole screen for a moment
+            "snippingtool", "screenclippinghost", "screensketch", "sharex", "lightshot", "greenshot", "obs64", "gamebar", "gamebarftserver" };
         static uint _lastPid; static bool _lastNotGame;
         static bool IsBrowserOrPlayer(uint pid)
         {
