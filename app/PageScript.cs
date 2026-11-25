@@ -161,7 +161,7 @@ const ms = window.__ms = {
   },
   // ---- settings, remembered between launches ----
   look() {
-    let v = { color: '#5a2448', alpha: 82, accent: '#ff5fa8', eco: false, lvl: 5, miniOnMin: false };
+    let v = { color: '#5a2448', alpha: 82, accent: '#ff5fa8', eco: false, lvl: 5, miniOnMin: false, top: false, topColor: '#101014', topAlpha: 70 };
     try { v = Object.assign(v, JSON.parse(localStorage.getItem('ms-look') || '{}')); } catch (e) {}
     if (v.lvl === undefined && v.mem !== undefined) v.lvl = 5;   // older settings
     return v;
@@ -189,7 +189,13 @@ const ms = window.__ms = {
     st.setProperty('--ms-accent', v.accent);
     st.setProperty('--ms-accent-hi', 'rgb(' + [ar, ag, ab].map(c => Math.round(c + (255 - c) * .2)).join(',') + ')');
     st.setProperty('--ms-accent-ink', alum > .55 ? '#141414' : '#ffffff');
+    // optional glass bar behind the top row (search, profile, window buttons), with its own colour and transparency
+    const [tr, tg, tb] = rgb(v.topColor || v.color);
+    st.setProperty('--ms-top-rgb', tr + ',' + tg + ',' + tb);
+    st.setProperty('--ms-top-alpha', ((+v.topAlpha >= 0 ? +v.topAlpha : 70) / 100).toFixed(2));
     const cl = document.documentElement.classList;
+    cl.toggle('ms-topbar', !!v.top && glass);
+    if (this.fitControls) requestAnimationFrame(() => this.fitControls());
     const eco = lvl <= 2;   // Light level includes the CPU savings (the separate Eco switch was removed: no noticeable effect)
     cl.toggle('ms-light', lum > .62 && (alpha > .55));
     cl.toggle('ms-solid', !glass);
@@ -255,6 +261,9 @@ const ms = window.__ms = {
       '<div class=""ms-h"">Panel colour</div>' + row('ms-panel', panelSw, v.color) +
       '<div class=""ms-alphawrap""><div class=""ms-h"">Transparency <span class=""ms-val ms-alphaval""></span></div><input class=""ms-range"" type=""range"" min=""0"" max=""95"" value=""' + (100 - v.alpha) + '""></div>' +
       '<div class=""ms-h"">Highlight colour</div>' + row('ms-accent', accentSw, v.accent) +
+      '<div class=""ms-topwrap""><label class=""ms-check ms-top""><input type=""checkbox""' + (v.top ? ' checked' : '') + '><span><b>Top bar background</b><br>A glass bar behind the search bar and window buttons</span></label>' +
+      '<div class=""ms-topopts""><div class=""ms-h"">Top bar colour</div>' + row('ms-topc', panelSw, v.topColor || '#101014') +
+      '<div class=""ms-h"">Top bar transparency <span class=""ms-val ms-topval""></span></div><input class=""ms-toprange"" type=""range"" min=""0"" max=""95"" value=""' + (100 - (+v.topAlpha >= 0 ? +v.topAlpha : 70)) + '""></div></div>' +
       '<label class=""ms-check ms-minimin""><input type=""checkbox""' + (v.miniOnMin ? ' checked' : '') + '><span><b>Minimize to mini player</b><br>Minimizing hides the main window and leaves only the mini player</span></label>' +
       '<div class=""ms-h"">Gaming</div>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""game""><span><b>Automatic game mode</b><br>When a fullscreen game starts, switch to the mini player and low priority; restore after</span></label>' +
@@ -271,6 +280,7 @@ const ms = window.__ms = {
     const $ = s => p.querySelector(s);
     const lvlR = $('.ms-lvl'), range = $('.ms-range'), pick = $('.ms-panel input'), apick = $('.ms-accent input');
     const minimin = $('.ms-minimin input'), note = $('.ms-note');
+    const topChk = $('.ms-top input'), tpick = $('.ms-topc input'), trange = $('.ms-toprange');
     const needsRestart = () => { const l = +lvlR.value; return glassOf(l) !== glassOf(start) || gpuOf(l) !== gpuOf(start); };
     const show = () => {
       const l = +lvlR.value;
@@ -278,11 +288,17 @@ const ms = window.__ms = {
       $('.ms-lvldesc').textContent = LEVELS[l][1];
       $('.ms-alphaval').textContent = range.value + '%';
       $('.ms-alphawrap').classList.toggle('ms-dim', !glassOf(l));
+      $('.ms-topwrap').classList.toggle('ms-dim', !glassOf(l));   // glass looks only (solid looks are already opaque)
+      $('.ms-topopts').style.display = topChk.checked ? '' : 'none';
+      $('.ms-topval').textContent = trange.value + '%';
       note.textContent = needsRestart() ? 'Done restarts Glassify (about 3 s) to apply this. Your song keeps going.' : '';
     };
-    const save = () => this.setLook({ color: pick.value, alpha: 100 - (+range.value), accent: apick.value, eco: false, lvl: +lvlR.value, miniOnMin: minimin.checked });
+    const save = () => this.setLook({ color: pick.value, alpha: 100 - (+range.value), accent: apick.value, eco: false, lvl: +lvlR.value, miniOnMin: minimin.checked,
+                                      top: topChk.checked, topColor: tpick.value, topAlpha: 100 - (+trange.value) });
     const update = () => { show(); save(); };
     lvlR.oninput = update; minimin.onchange = update;
+    topChk.onchange = update; tpick.oninput = update; trange.oninput = update;
+    p.querySelectorAll('.ms-topc button').forEach(b => b.onclick = () => { tpick.value = b.dataset.c; update(); });
     // gaming & extras switches are app options (saved by Glassify itself, so they work before the page loads)
     const o = this.opts();
     p.querySelectorAll('input[data-o]').forEach(c => { c.checked = !!o[c.dataset.o]; c.onchange = () => { const n = this.opts(); n[c.dataset.o] = c.checked; this.setOpts(n); }; });
@@ -291,7 +307,8 @@ const ms = window.__ms = {
     p.querySelectorAll('.ms-panel button').forEach(b => b.onclick = () => { pick.value = b.dataset.c; update(); });
     p.querySelectorAll('.ms-accent button').forEach(b => b.onclick = () => { apick.value = b.dataset.c; update(); });
     pick.oninput = update; apick.oninput = update; range.oninput = update;
-    $('.ms-reset').onclick = () => { lvlR.value = 5; pick.value = '#5a2448'; apick.value = '#ff5fa8'; range.value = 18; minimin.checked = false; update(); };
+    $('.ms-reset').onclick = () => { lvlR.value = 5; pick.value = '#5a2448'; apick.value = '#ff5fa8'; range.value = 18; minimin.checked = false;
+      topChk.checked = false; tpick.value = '#101014'; trange.value = 30; update(); };
     $('.ms-done').onclick = () => {
       p.remove();
       if (+lvlR.value === 5 && start <= 4) { try { localStorage.setItem('ms-npv-open', '1'); } catch (e) {} }
@@ -383,6 +400,15 @@ const ms = window.__ms = {
     const w = document.getElementById('ms-winctl'); if (!w) return;
     const px = Math.ceil(w.getBoundingClientRect().width) + 26;
     if (px > 26 && this._ctlw !== px) { this._ctlw = px; document.documentElement.style.setProperty('--ms-ctl-w', px + 'px'); }
+    // with the top bar background on, sit the window buttons in the middle of that bar, just inside its right end
+    const bar = document.documentElement.classList.contains('ms-topbar') && q('[data-testid=""global-nav-bar""]');
+    let pos = '';
+    if (bar) { const r = bar.getBoundingClientRect(); if (r.height > 20) pos = Math.round(r.top + (r.height - w.offsetHeight) / 2) + ',' + Math.round(innerWidth - r.right + 12); }
+    if (this._ctlpos !== pos) {
+      this._ctlpos = pos;
+      const [t, rt] = pos ? pos.split(',') : ['', ''];
+      w.style.top = t ? t + 'px' : ''; w.style.right = rt ? rt + 'px' : '';
+    }
   },
   // one click: Glassify downloads, checks and installs the update, then restarts itself
   startUpdate() {

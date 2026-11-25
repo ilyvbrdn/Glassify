@@ -30,6 +30,11 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
   background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94)) !important;
   border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }
 [data-testid="search-input"] { background: transparent !important; }
+/* optional top bar background (gear menu > Top bar background): its own colour + transparency, floating like the panels */
+html.ms-topbar [data-testid="global-nav-bar"] {
+  background: rgba(var(--ms-top-rgb, 16,16,20), var(--ms-top-alpha, .7)) !important;
+  border: 1px solid rgba(255,255,255,.13) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
+  border-radius: 22px !important; margin: 6px 8px 0 !important; }
 
 /* highlight colour instead of Spotify green */
 :root, .encore-dark-theme, .encore-dark-theme .encore-base-set {
