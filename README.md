@@ -6,6 +6,8 @@ A light, floating, glass-styled Windows player for Spotify. It runs Spotify's ow
 your library and Premium all work normally) inside a minimal see-through window, with a player you can shrink
 into a floating card or dock to the edge of your screen, and features for listening while gaming.
 
+**Website: [ilyvbrdn.github.io/Glassify](https://ilyvbrdn.github.io/Glassify/)**
+
 ![Glassify with a two-colour gradient](screenshots/glassify-gradient.png)
 
 ## Download

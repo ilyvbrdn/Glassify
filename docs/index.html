@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glassify: Spotify, under glass</title>
+<meta name="description" content="A light, floating, glass-styled Windows player for Spotify. A see-through window, a mini player or a bar on the edge of your screen, and out of the way when you game. Free and open source.">
+<meta property="og:title" content="Glassify: Spotify, under glass">
+<meta property="og:description" content="A light, floating, glass-styled Windows player for Spotify. Free and open source.">
+<meta property="og:image" content="https://ilyvbrdn.github.io/Glassify/img/look-gradient.jpg">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0b0a1a">
+<link rel="icon" type="image/png" href="img/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0a1a;
+  --ink: #f4f2ff;
+  --ink-2: rgba(244, 242, 255, .72);
+  --ink-3: rgba(244, 242, 255, .5);
+  --glass: rgba(255, 255, 255, .06);
+  --glass-2: rgba(255, 255, 255, .1);
+  --line: rgba(255, 255, 255, .12);
+  --pink: #ff5fa8;
+  --violet: #8b6cff;
+  --cyan: #22d3ee;
+  --accent: var(--pink);
+  --radius: 22px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 400 17px/1.6 Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+img { display: block; max-width: 100%; }
+a { color: inherit; }
+h1, h2, h3 { font-family: Sora, Inter, sans-serif; letter-spacing: -.02em; margin: 0; }
+p { margin: 0; }
+
+/* ---------- aurora: drifting light behind all the glass ---------- */
+.aurora { position: fixed; inset: -20vmax; z-index: -1; pointer-events: none; filter: blur(70px) saturate(1.2); opacity: .75; }
+.aurora i { position: absolute; border-radius: 50%; mix-blend-mode: screen; animation: drift 26s ease-in-out infinite alternate; }
+.aurora i:nth-child(1) { width: 46vmax; height: 46vmax; left: 8%;  top: 6%;  background: radial-gradient(circle, var(--pink), transparent 65%); }
+.aurora i:nth-child(2) { width: 52vmax; height: 52vmax; right: 4%; top: 18%; background: radial-gradient(circle, var(--violet), transparent 65%); animation-duration: 32s; animation-delay: -8s; }
+.aurora i:nth-child(3) { width: 40vmax; height: 40vmax; left: 34%; bottom: 0;  background: radial-gradient(circle, var(--cyan), transparent 65%); animation-duration: 38s; animation-delay: -16s; opacity: .7; }
+@keyframes drift { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(6vmax, -4vmax) scale(1.12); } 100% { transform: translate(-5vmax, 5vmax) scale(.94); } }
+.grain { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+.wrap { width: min(1180px, 100% - 32px); margin: 0 auto; }
+.glass {
+  background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 20px 60px -20px rgba(0,0,0,.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3);
+}
+
+/* ---------- nav ---------- */
+nav { position: sticky; top: 14px; z-index: 20; margin-top: 14px; }
+nav .glass { display: flex; align-items: center; gap: 22px; padding: 10px 12px 10px 16px; border-radius: 999px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 18px Sora, sans-serif; text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+nav .links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+nav .links a { color: var(--ink-2); text-decoration: none; transition: color .2s; }
+nav .links a:hover { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 999px; font: 600 15px Inter, sans-serif;
+  text-decoration: none; border: 1px solid var(--line); background: var(--glass-2); color: var(--ink); transition: transform .2s, background .2s, box-shadow .2s; cursor: pointer; }
+.btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.16); }
+.btn.primary { background: linear-gradient(135deg, var(--accent), var(--violet)); border-color: transparent; color: #fff;
+  box-shadow: 0 10px 30px -8px color-mix(in srgb, var(--accent) 70%, transparent); }
+.btn.primary:hover { box-shadow: 0 14px 36px -8px color-mix(in srgb, var(--accent) 85%, transparent); }
+.btn.small { padding: 8px 14px; font-size: 14px; }
+.btn svg { width: 18px; height: 18px; }
+
+/* ---------- hero ---------- */
+.hero { padding: 84px 0 40px; text-align: center; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--ink-2); }
+.eyebrow b { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.hero h1 { font-size: clamp(46px, 8.4vw, 104px); font-weight: 800; line-height: .98; margin: 22px 0 0; }
+.hero h1 em { font-style: normal; background: linear-gradient(100deg, var(--pink), var(--violet) 45%, var(--cyan)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .lead { max-width: 640px; margin: 24px auto 0; font-size: clamp(17px, 2vw, 20px); color: var(--ink-2); }
+.cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+.fine { margin-top: 16px; font-size: 13px; color: var(--ink-3); }
+
+/* the stage: look switcher + window + floating mini player */
+.stage { position: relative; margin: 64px auto 0; max-width: 1120px; perspective: 1800px; }
+.switch { display: inline-flex; padding: 5px; gap: 4px; border-radius: 999px; margin-bottom: 22px; }
+.switch button { border: 0; background: transparent; color: var(--ink-2); font: 600 14px Inter, sans-serif; padding: 9px 18px; border-radius: 999px; cursor: pointer; transition: background .25s, color .25s; }
+.switch button.on { background: rgba(255,255,255,.16); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+.switch button:focus-visible, .shape button:focus-visible, .tabs button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.window { position: relative; border-radius: 18px; overflow: hidden; transform: rotateX(8deg); transform-origin: 50% 0;
+  box-shadow: 0 60px 120px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.08); transition: transform .8s cubic-bezier(.2,.8,.2,1); aspect-ratio: 1600 / 954; background: #120f24; }
+.window.flat { transform: rotateX(0); }
+.window img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .6s ease; }
+.window img.on { opacity: 1; }
+.look-note { margin: 0 auto 22px; max-width: 620px; font-size: 15px; color: var(--ink-2); min-height: 3.2em; }
+.floater { position: absolute; left: -3%; bottom: -6%; width: 34%; border-radius: 14px; box-shadow: 0 30px 60px -18px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.12);
+  animation: bob 7s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-10px); } }
+
+/* ---------- sections ---------- */
+section { padding: 110px 0 0; }
+.kicker { font: 700 13px Sora, sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.sec-head { max-width: 720px; }
+.sec-head h2 { font-size: clamp(32px, 4.6vw, 54px); line-height: 1.05; margin-top: 12px; }
+.sec-head p { margin-top: 16px; color: var(--ink-2); font-size: 18px; }
+.center { text-align: center; margin: 0 auto; }
+
+/* colours */
+.split { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; align-items: center; margin-top: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.chip { padding: 8px 14px; border-radius: 999px; font-size: 14px; color: var(--ink-2); }
+.chip i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+.shot { border-radius: 16px; overflow: hidden; box-shadow: 0 40px 80px -30px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.08); }
+
+/* the monitor: player shapes */
+.player-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; margin-top: 46px; align-items: start; }
+.monitor { padding: 14px; border-radius: 26px; }
+.screen { position: relative; aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden;
+  background: radial-gradient(circle at 25% 30%, rgba(255,95,168,.55), transparent 45%), radial-gradient(circle at 80% 70%, rgba(34,211,238,.45), transparent 45%), linear-gradient(135deg, #2a1650, #10224a); }
+.screen .app-win { position: absolute; border-radius: 10px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); transition: all .7s cubic-bezier(.2,.8,.2,1); }
+.screen .app-win::before { content: ""; position: absolute; inset: 10px; border-radius: 6px; background: repeating-linear-gradient(180deg, rgba(255,255,255,.08) 0 8px, transparent 8px 18px); opacity: .7; }
+.screen .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 7%; background: rgba(10,8,24,.75); }
+.pl { position: absolute; display: flex; align-items: center; gap: 8%; padding: 0 2.5%; border: 1px solid rgba(255,255,255,.22); overflow: hidden;
+  background: linear-gradient(120deg, rgba(139,108,255,.85), rgba(34,211,238,.6)); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,.6); transition: all .7s cubic-bezier(.2,.8,.2,1); }
+.pl .cov { flex: none; aspect-ratio: 1; height: 62%; border-radius: 5px; background: linear-gradient(135deg, #ff5fa8, #7c3aed); }
+.pl .ln { height: 9%; border-radius: 9px; background: rgba(255,255,255,.65); flex: 1; }
+.pl .dot { flex: none; aspect-ratio: 1; height: 44%; border-radius: 50%; background: #fff; }
+.pl.vertical { flex-direction: column; justify-content: flex-start; padding: 4% 3%; gap: 2.5%; }
+.pl.vertical .cov { width: 100%; height: auto; }
+.pl.vertical .ln { flex: none; width: 100%; height: 1.6%; }
+.pl.vertical .dot { height: auto; width: 22%; }
+.shape { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.shape button { border: 1px solid var(--line); background: var(--glass); color: var(--ink-2); font: 600 14px Inter, sans-serif; padding: 9px 16px; border-radius: 999px; cursor: pointer; transition: all .2s; }
+.shape button.on { color: #fff; background: linear-gradient(135deg, var(--accent), var(--violet)); border-color: transparent; }
+.shape-note { margin-top: 14px; color: var(--ink-2); font-size: 15px; min-height: 3.2em; }
+.stack { position: relative; height: 560px; }
+.stack .shot { position: absolute; width: 60%; transition: transform .4s; }
+.stack .shot:hover { transform: translateY(-6px) rotate(0deg) !important; z-index: 5; }
+.stack .s1 { left: 0; top: 0; transform: rotate(-4deg); }
+.stack .s2 { right: 0; top: 60px; transform: rotate(3deg); z-index: 2; }
+.stack .s3 { left: 12%; top: 380px; width: 80%; transform: rotate(-1deg); z-index: 3; border-radius: 12px; }
+.barstrip { margin-top: 34px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px -20px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.08); }
+.barstrip img { width: 100%; }
+.caption { margin-top: 10px; font-size: 14px; color: var(--ink-3); text-align: center; }
+
+/* gaming */
+.game { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+.arena { position: relative; aspect-ratio: 4 / 3; border-radius: 22px; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 120%, rgba(255,95,168,.45), transparent 60%), linear-gradient(180deg, #0d1330 0%, #1a0f2e 60%, #2b1240 100%); }
+.arena::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: -5%; height: 55%;
+  background: linear-gradient(transparent 0, rgba(34,211,238,.25) 1px, transparent 2px) 0 0 / 100% 28px, linear-gradient(90deg, transparent 0, rgba(34,211,238,.25) 1px, transparent 2px) 0 0 / 48px 100%;
+  transform: perspective(300px) rotateX(55deg); transform-origin: 50% 100%; }
+.arena .sun { position: absolute; left: 50%; top: 22%; width: 34%; aspect-ratio: 1; transform: translateX(-50%); border-radius: 50%;
+  background: linear-gradient(#ffcf5c, #ff5fa8 70%); box-shadow: 0 0 80px rgba(255,95,168,.6); }
+.arena .ghost { position: absolute; right: 5%; top: 6%; width: 56%; border-radius: 10px; opacity: .8; box-shadow: 0 0 0 1px rgba(255,255,255,.1); }
+.arena .cursor { position: absolute; width: 22px; left: 62%; top: 9%; animation: aim 5s ease-in-out infinite; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+@keyframes aim { 0%, 100% { left: 62%; top: 9%; } 45% { left: 74%; top: 22%; } 55% { left: 74%; top: 22%; } }
+.arena .hit { position: absolute; left: 74%; top: 22%; width: 40px; height: 40px; margin: -12px; border-radius: 50%; border: 2px solid var(--cyan); opacity: 0; animation: hit 5s ease-out infinite; }
+@keyframes hit { 0%, 48% { opacity: 0; transform: scale(.3); } 52% { opacity: 1; } 70%, 100% { opacity: 0; transform: scale(1.6); } }
+.arena .tag { position: absolute; left: 4%; bottom: 5%; padding: 6px 12px; border-radius: 999px; font-size: 12px; color: var(--ink-2); }
+.points { display: grid; gap: 14px; margin-top: 28px; }
+.point { display: flex; gap: 14px; padding: 16px 18px; border-radius: 16px; }
+.point .ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: rgba(255,255,255,.1); font-size: 18px; }
+.point b { display: block; font-family: Sora, sans-serif; font-weight: 600; }
+.point span { color: var(--ink-2); font-size: 15px; }
+
+/* numbers */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+.stat { padding: 28px 26px; border-radius: 20px; }
+.stat .n { font: 800 clamp(38px, 5vw, 56px)/1 Sora, sans-serif; background: linear-gradient(100deg, #fff, var(--accent)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stat .l { margin-top: 10px; color: var(--ink-2); font-size: 15px; }
+.stats-note { margin-top: 12px; font-size: 13px; color: var(--ink-3); }
+
+/* settings-panel feature list */
+.panel { max-width: 760px; margin: 40px auto 0; padding: 18px; border-radius: 24px; }
+.tabs { display: flex; gap: 6px; padding: 5px; border-radius: 16px; background: rgba(0,0,0,.25); }
+.tabs button { flex: 1; border: 0; background: transparent; color: var(--ink-2); font: 600 15px Inter, sans-serif; padding: 10px 8px; border-radius: 12px; cursor: pointer; transition: all .2s; }
+.tabs button.on { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px var(--accent); }
+.page { display: none; padding: 10px 8px 4px; }
+.page.on { display: block; animation: fade .35s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.row { display: flex; gap: 16px; padding: 16px 6px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.row:last-child { border-bottom: 0; }
+.row .tog { flex: none; width: 38px; height: 22px; margin-top: 3px; border-radius: 999px; background: var(--accent); position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+.row .tog::after { content: ""; position: absolute; right: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.row b { display: block; font-family: Sora, sans-serif; font-weight: 600; font-size: 16px; }
+.row span { color: var(--ink-2); font-size: 15px; }
+
+/* keys */
+.keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 40px; }
+@media (max-width: 900px) { .keys { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .keys { grid-template-columns: 1fr; } }
+.key { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-radius: 16px; }
+.key span { color: var(--ink-2); font-size: 15px; }
+kbd { font: 600 13px Inter, sans-serif; padding: 5px 9px; border-radius: 8px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-bottom-width: 3px; white-space: nowrap; }
+
+/* install */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; counter-reset: s; }
+.step { padding: 26px; border-radius: 20px; position: relative; }
+.step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; font: 700 17px Sora, sans-serif;
+  background: linear-gradient(135deg, var(--accent), var(--violet)); margin-bottom: 16px; }
+.step b { font-family: Sora, sans-serif; font-size: 18px; display: block; }
+.step span { display: block; margin-top: 6px; color: var(--ink-2); font-size: 15px; }
+.step code { font: 500 13px ui-monospace, Consolas, monospace; background: rgba(255,255,255,.1); padding: 2px 6px; border-radius: 6px; }
+
+/* closing */
+.outro { margin: 120px auto 0; padding: 60px 30px; text-align: center; border-radius: 30px; max-width: 900px; }
+.outro h2 { font-size: clamp(30px, 4.4vw, 50px); }
+.outro p { margin: 14px auto 0; max-width: 520px; color: var(--ink-2); }
+footer { padding: 50px 0 60px; text-align: center; font-size: 13px; color: var(--ink-3); }
+footer a { color: var(--ink-2); }
+
+/* reveal on scroll */
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1); }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (max-width: 900px) {
+  nav .links { display: none; }
+  nav .glass { justify-content: space-between; }
+  .split, .player-grid, .game { grid-template-columns: 1fr; }
+  .stack { height: 520px; max-width: 520px; margin: 0 auto; width: 100%; }
+  .stats, .steps { grid-template-columns: 1fr; }
+  .floater { width: 50%; left: 2%; bottom: -12%; }
+  .stage { padding-bottom: 8%; }
+  .window { transform: rotateX(4deg); }
+}
+@media (max-width: 520px) {
+  .hero { padding-top: 56px; }
+  .switch button { padding: 8px 11px; font-size: 13px; }
+  .stack { height: 470px; }
+  .stack .s3 { top: auto; bottom: 0; left: 6%; width: 88%; }
+  .tabs button { font-size: 13px; padding: 9px 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .reveal { opacity: 1; transform: none; }
+}
+</style>
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="wrap">
+  <nav>
+    <div class="glass">
+      <a class="brand" href="#top"><img src="img/icon.png" alt="">Glassify</a>
+      <div class="links">
+        <a href="#looks">Looks</a><a href="#player">Player</a><a href="#gaming">Gaming</a><a href="#features">Features</a><a href="#install">Install</a>
+      </div>
+      <a class="btn small" href="https://github.com/ilyvbrdn/Glassify" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7.3L12 17.8 5.8 21.5l1.6-7.3L2 9.5l7.1-.6z"/></svg>Star on GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <span class="eyebrow glass"><b></b>Free &amp; open source · Windows 10 / 11</span>
+    <h1>Spotify,<br><em>under glass.</em></h1>
+    <p class="lead">A light, floating player for Spotify on Windows. Your music in a see-through window, a mini player or a bar on the edge of your screen, and out of the way the moment you start a game.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/ilyvbrdn/Glassify/releases/latest" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5l7.5-1v7H3zm0 13l7.5 1v-7H3zm8.5 1.1L21 21v-8.5h-9.5zm0-15.2V11.5H21V3z"/></svg>Download for Windows</a>
+      <a class="btn" href="#install">How to install</a>
+    </div>
+    <p class="fine">Unofficial · needs Spotify Premium · updates itself</p>
+
+    <div class="stage reveal">
+      <div class="switch glass" role="tablist" aria-label="Pick a look">
+        <button class="on" data-look="gradient" role="tab" aria-selected="true">Gradient</button>
+        <button data-look="glass" role="tab" aria-selected="false">Glass</button>
+        <button data-look="solid" role="tab" aria-selected="false">Solid</button>
+        <button data-look="light" role="tab" aria-selected="false">Light</button>
+      </div>
+      <p class="look-note" id="lookNote">One gradient flows across the whole window, the search box, the mini player and the bar.</p>
+      <div class="window" id="win">
+        <img class="on" data-look="gradient" src="img/look-gradient.jpg" alt="Glassify with a purple to blue gradient, see-through panels and a glass top bar">
+        <img data-look="glass" src="img/look-glass.jpg" alt="Glassify in the Glass look, pink see-through panels" loading="lazy">
+        <img data-look="solid" src="img/look-solid.jpg" alt="Glassify in the Solid look, a normal purple window" loading="lazy">
+        <img data-look="light" src="img/look-light.jpg" alt="Glassify in the Light look, flat light colours" loading="lazy">
+      </div>
+      <img class="floater" src="img/mini-wide.jpg" alt="The Glassify mini player">
+    </div>
+  </header>
+
+  <section id="looks">
+    <div class="split">
+      <div class="sec-head reveal">
+        <span class="kicker">Your colours</span>
+        <h2>Make it look like yours.</h2>
+        <p>Pick any panel colour, or blend two into a gradient at any angle with a balance slider. Set how see-through the glass is, choose your own highlight instead of Spotify green, and float a glass bar behind the search box. Light colours automatically get dark text, so it always stays readable.</p>
+        <div class="chips">
+          <span class="chip glass"><i style="background:linear-gradient(135deg,#6d28d9,#0e7490)"></i>Two-colour gradient</span>
+          <span class="chip glass"><i style="background:#ff5fa8"></i>Highlight colour</span>
+          <span class="chip glass"><i style="background:rgba(255,255,255,.4)"></i>Transparency</span>
+          <span class="chip glass"><i style="background:#22d3ee"></i>Glass top bar</span>
+        </div>
+      </div>
+      <div class="shot reveal"><img src="img/settings.jpg" alt="The Glassify settings panel open on the Look tab" loading="lazy"></div>
+    </div>
+  </section>
+
+  <section id="player">
+    <div class="sec-head center reveal">
+      <span class="kicker">The player</span>
+      <h2>One player. Two shapes.</h2>
+      <p>Shrink Glassify into a small card that floats on top, or dock it as a bar on any edge of any screen. Windows make room for the bar like they do for the taskbar. Ctrl+Alt+B switches between them.</p>
+    </div>
+    <div class="player-grid">
+      <div class="reveal">
+        <div class="monitor glass">
+          <div class="screen" id="screen">
+            <div class="app-win" id="appWin"></div>
+            <div class="pl" id="pl"><span class="cov"></span><span class="ln"></span><span class="dot"></span></div>
+            <div class="taskbar"></div>
+          </div>
+        </div>
+        <div class="shape" id="shape" role="tablist" aria-label="Player shape">
+          <button class="on" data-s="top">Bar on top</button>
+          <button data-s="bottom">Bottom</button>
+          <button data-s="left">Left</button>
+          <button data-s="right">Right</button>
+          <button data-s="card">Mini player</button>
+        </div>
+        <p class="shape-note" id="shapeNote"></p>
+      </div>
+      <div class="stack reveal">
+        <div class="shot s1"><img src="img/bar-menu.jpg" alt="The bar's menu listing a library" loading="lazy"></div>
+        <div class="shot s2"><img src="img/bar-search.jpg" alt="Searching songs from the bar's menu" loading="lazy"></div>
+        <div class="shot s3"><img src="img/mini-wide.jpg" alt="The mini player, wide" loading="lazy"></div>
+      </div>
+    </div>
+    <div class="barstrip reveal"><img src="img/bar.jpg" alt="The bar docked to the top of the screen: song, timeline, next in queue and recently played" loading="lazy"></div>
+    <p class="caption">The bar: the song, a timeline with the like button, next in queue and your recently played playlists.</p>
+  </section>
+
+  <section id="gaming">
+    <div class="game">
+      <div class="reveal">
+        <span class="kicker">Gaming</span>
+        <div class="sec-head"><h2>Starts a game? Glassify steps aside.</h2>
+          <p>The moment a fullscreen game opens, Glassify hides its window, keeps only the player and drops to low priority so your game gets the computer. Close the game and everything comes back.</p></div>
+        <div class="points">
+          <div class="point glass"><div class="ico">👻</div><div><b>Ghost mini player</b><span>See-through and click-through, so it never steals a click in the middle of a fight. Ctrl+Alt+G any time.</span></div></div>
+          <div class="point glass"><div class="ico">🎯</div><div><b>Knows what's a game</b><span>Browsers, fullscreen videos and screenshot tools don't set it off.</span></div></div>
+          <div class="point glass"><div class="ico">⌨️</div><div><b>Hands stay on the keyboard</b><span>Media keys and Ctrl+Alt shortcuts for play, skip, like and volume, from inside any game.</span></div></div>
+        </div>
+      </div>
+      <div class="arena reveal" aria-label="A game with the ghost mini player on top; clicks pass straight through it">
+        <div class="sun"></div>
+        <img class="ghost" src="img/ghost.jpg" alt="The ghost mini player" loading="lazy">
+        <svg class="cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2l14 9-6.5 1.4L15 20l-3 1.5-3.4-7.4L4 18z" fill="#fff" stroke="#000" stroke-width="1"/></svg>
+        <span class="hit"></span>
+        <span class="tag glass">Clicks go straight through to your game</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="light">
+    <div class="sec-head center reveal">
+      <span class="kicker">Light on your PC</span>
+      <h2>Quick to open. Quiet in the background.</h2>
+      <p>Glassify runs Spotify's own web player in a minimal shell. When you're not looking at it, it lowers its priority and saves memory.</p>
+    </div>
+    <div class="stats">
+      <div class="stat glass reveal"><div class="n">~3 s</div><div class="l">from launch to ready, signed in</div></div>
+      <div class="stat glass reveal"><div class="n">0.4%</div><div class="l">CPU while minimized and playing</div></div>
+      <div class="stat glass reveal"><div class="n">5 s</div><div class="l">to install an update, music still playing</div></div>
+    </div>
+    <p class="stats-note center" style="text-align:center">Measured on our test PC; your numbers will vary.</p>
+  </section>
+
+  <section id="features">
+    <div class="sec-head center reveal">
+      <span class="kicker">Everything it does</span>
+      <h2>The whole list, in its own settings.</h2>
+      <p>These are the same four tabs you'll find behind the gear in Glassify.</p>
+    </div>
+    <div class="panel glass reveal">
+      <div class="tabs" role="tablist" aria-label="Feature groups">
+        <button class="on" data-t="look" role="tab" aria-selected="true">Look</button>
+        <button data-t="player" role="tab" aria-selected="false">Player</button>
+        <button data-t="gaming" role="tab" aria-selected="false">Gaming</button>
+        <button data-t="more" role="tab" aria-selected="false">More</button>
+      </div>
+      <div class="page on" data-p="look">
+        <div class="row"><span class="tog"></span><div><b>Glass, Solid or Light</b><span>Floating see-through glass, a normal solid window, or the lightest look of all: flat colours, low priority, memory saver.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Gradient panels</b><span>Two colours, any angle, a balance slider. One gradient across the whole window, followed by the mini player and bar.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Transparency and highlight colour</b><span>Choose how see-through the glass is and the colour of play buttons and progress bars.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Glass top bar</b><span>An optional bar behind the search box and window buttons, matching your panels or in its own colour.</span></div></div>
+      </div>
+      <div class="page" data-p="player">
+        <div class="row"><span class="tog"></span><div><b>Mini player, any size</b><span>Always on top, with cover, controls, like and seek. Drag any edge; tall gives a big cover. Scroll for volume.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Bar on any edge of any screen</b><span>Top, bottom, left or right. Shows next in queue and recently played; on the side it becomes a sidebar.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Library and search in the bar</b><span>Open its menu to play anything from your library or search for a song.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Minimize or close to the player</b><span>The dash and the × leave the player running. Quit from the icon by the clock.</span></div></div>
+      </div>
+      <div class="page" data-p="gaming">
+        <div class="row"><span class="tog"></span><div><b>Automatic game mode</b><span>Fullscreen game starts: main window hidden, player shown, low priority. Game closes: everything back.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Ghost mini player in games</b><span>See-through and click-through while you play, so it never blocks a click.</span></div></div>
+      </div>
+      <div class="page" data-p="more">
+        <div class="row"><span class="tog"></span><div><b>Automatic updates</b><span>Checks when it starts and every 2 hours, installs in seconds, never during a game. Your login and settings stay.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Song-change popup</b><span>A small popup with the cover when the song changes and Glassify isn't in front.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Start with Windows</b><span>Optional, and it can start straight into the mini player.</span></div></div>
+        <div class="row"><span class="tog"></span><div><b>Crash recovery</b><span>If Spotify's page crashes, Glassify reloads it and keeps playing.</span></div></div>
+      </div>
+    </div>
+
+    <div class="keys">
+      <div class="key glass reveal"><span>Show / hide the player</span><kbd>Ctrl Alt M</kbd></div>
+      <div class="key glass reveal"><span>Mini player ↔ bar</span><kbd>Ctrl Alt B</kbd></div>
+      <div class="key glass reveal"><span>Ghost mini player</span><kbd>Ctrl Alt G</kbd></div>
+      <div class="key glass reveal"><span>Like the song</span><kbd>Ctrl Alt L</kbd></div>
+      <div class="key glass reveal"><span>Volume</span><kbd>Ctrl Alt ↑ ↓</kbd></div>
+      <div class="key glass reveal"><span>Play, skip, back</span><kbd>Media keys</kbd></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="sec-head center reveal">
+      <span class="kicker">Install</span>
+      <h2>Three steps, then it updates itself.</h2>
+    </div>
+    <div class="steps">
+      <div class="step glass reveal"><b>Download</b><span>Get the zip from the <a href="https://github.com/ilyvbrdn/Glassify/releases/latest" rel="noopener">latest release</a>.</span></div>
+      <div class="step glass reveal"><b>Extract</b><span>Unzip it somewhere you can write to, like Documents or Downloads. Not Program Files.</span></div>
+      <div class="step glass reveal"><b>Run</b><span>Open <code>Glassify.exe</code> and sign in to Spotify. If Windows says it protected your PC, choose <i>More info</i>, then <i>Run anyway</i>.</span></div>
+    </div>
+    <p class="stats-note" style="text-align:center;margin-top:18px">Needs Windows 10 or 11 and Spotify Premium. The Edge WebView2 runtime comes with Windows 11.</p>
+  </section>
+
+  <div class="outro glass reveal">
+    <h2>Put your music under glass.</h2>
+    <p>Free and open source. If you like it, a star on GitHub helps other people find it.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/ilyvbrdn/Glassify/releases/latest" rel="noopener">Download for Windows</a>
+      <a class="btn" href="https://github.com/ilyvbrdn/Glassify" rel="noopener">★ Star on GitHub</a>
+    </div>
+  </div>
+
+  <footer>
+    Glassify is not affiliated with Spotify. It runs Spotify's official web player unmodified and only changes the look and the window.<br>
+    Screenshots use a demo library. <a href="https://github.com/ilyvbrdn/Glassify/issues" rel="noopener">Report a bug or share an idea</a>.
+  </footer>
+</div>
+
+<script>
+// look switcher: swap the hero screenshot and tint the page
+const looks = {
+  gradient: { accent: '#22d3ee', note: 'One gradient flows across the whole window, the search box, the mini player and the bar.' },
+  glass:    { accent: '#ff5fa8', note: 'Floating see-through panels in any colour, with the transparency you choose.' },
+  solid:    { accent: '#f59e0b', note: 'A normal solid window: no see-through effects, cheaper to draw.' },
+  light:    { accent: '#8b6cff', note: 'The lightest of all: flat colours, low priority and memory saver. Every button still works.' }
+};
+const sw = document.querySelectorAll('.switch button'), shots = document.querySelectorAll('#win img');
+function setLook(k) {
+  sw.forEach(b => { const on = b.dataset.look === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  shots.forEach(i => i.classList.toggle('on', i.dataset.look === k));
+  document.documentElement.style.setProperty('--accent', looks[k].accent);
+  document.getElementById('lookNote').textContent = looks[k].note;
+}
+sw.forEach(b => b.addEventListener('click', () => { setLook(b.dataset.look); clearInterval(cycle); }));
+const order = ['gradient', 'glass', 'solid', 'light']; let li = 0;
+const cycle = setInterval(() => { li = (li + 1) % order.length; setLook(order[li]); }, 4200);
+setLook('gradient');
+
+// the window flattens as you scroll to it
+const win = document.getElementById('win');
+addEventListener('scroll', () => win.classList.toggle('flat', scrollY > 120), { passive: true });
+
+// the monitor: move the player between shapes and edges
+const pl = document.getElementById('pl'), appWin = document.getElementById('appWin'), note = document.getElementById('shapeNote');
+const shapes = {
+  top:    { pl: { left: '0%', top: '0%', width: '100%', height: '9%', borderRadius: '0' }, win: { left: '12%', top: '15%', width: '76%', height: '70%' }, v: false, n: 'Docked to the top: other windows move down to make room, like they do for the taskbar.' },
+  bottom: { pl: { left: '0%', top: '84%', width: '100%', height: '9%', borderRadius: '0' }, win: { left: '12%', top: '8%', width: '76%', height: '70%' }, v: false, n: 'Above the taskbar, out of the way of everything else.' },
+  left:   { pl: { left: '0%', top: '0%', width: '19%', height: '93%', borderRadius: '0' }, win: { left: '25%', top: '10%', width: '68%', height: '72%' }, v: true, n: 'On the side it becomes a sidebar with a big cover, next in queue and recently played.' },
+  right:  { pl: { left: '81%', top: '0%', width: '19%', height: '93%', borderRadius: '0' }, win: { left: '6%', top: '10%', width: '68%', height: '72%' }, v: true, n: 'Works on any edge of any screen. Drag its grip to move it.' },
+  card:   { pl: { left: '64%', top: '64%', width: '32%', height: '16%', borderRadius: '10px' }, win: { left: '8%', top: '8%', width: '70%', height: '72%' }, v: false, n: 'The mini player: a small card that stays on top. Drag any edge to resize it.' }
+};
+function setShape(k) {
+  const s = shapes[k];
+  Object.assign(pl.style, s.pl); Object.assign(appWin.style, s.win);
+  pl.classList.toggle('vertical', s.v); note.textContent = s.n;
+  document.querySelectorAll('#shape button').forEach(b => { const on = b.dataset.s === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+}
+document.querySelectorAll('#shape button').forEach(b => b.addEventListener('click', () => setShape(b.dataset.s)));
+setShape('top');
+
+// feature tabs, like Glassify's own settings
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); });
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('on', p.dataset.p === b.dataset.t));
+}));
+
+// reveal sections as they scroll in
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
