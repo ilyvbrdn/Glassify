@@ -80,3 +80,11 @@ example under Program Files) the button just opens the release page.
 ## Notes
 Not affiliated with Spotify. Uses Spotify's official web player unmodified (no ad blocking, no downloading,
 no DRM changes); Glassify only changes the look and window.
+
+---
+
+<p align="center">
+  <b>Like Glassify? Give it a ⭐ star at the top of this page.</b><br>
+  It helps other people find it, and bug reports and ideas are welcome in
+  <a href="https://github.com/ilyvbrdn/Glassify/issues">Issues</a>.
+</p>
