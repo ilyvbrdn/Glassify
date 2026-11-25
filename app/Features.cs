@@ -145,7 +145,22 @@ namespace Glassify
 
         static void Check()
         {
-            try
+            try { Fetch(); }
+            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { Clear(); /* no releases */ }
+            catch (Exception ex) { Program.Log("update check: " + ex.Message); }
+        }
+
+        /// The update that was offered is gone (release removed, or already on the newest): hide the button.
+        static void Clear()
+        {
+            if (LatestTag == null) return;
+            LatestTag = LatestUrl = AssetUrl = AssetSha256 = null;
+            Program.Window?.HideUpdate();
+        }
+
+        /// Reads the latest release from GitHub. True (and the button shown) when it's newer than this copy.
+        static bool Fetch()
+        {
             {
                 string body;
                 if (TestFeed != null) body = File.ReadAllText(TestFeed);
@@ -159,8 +174,8 @@ namespace Glassify
                 }
                 var o = Program.Json.DeserializeObject(body);
                 var tag = Program.Str(o, "tag_name"); var url = Program.Str(o, "html_url");
-                if (tag == null || url == null || !url.StartsWith("https://github.com/" + Program.UpdateRepo + "/")) return;
-                if (!Newer(tag, Program.Version)) return;
+                if (tag == null || url == null || !url.StartsWith("https://github.com/" + Program.UpdateRepo + "/")) return false;
+                if (!Newer(tag, Program.Version)) { Clear(); return false; }
                 // the release's zip: must come from this repo's own release downloads (or the local test feed)
                 string asset = null, sha = null;
                 if (o is System.Collections.Generic.Dictionary<string, object> d && d.TryGetValue("assets", out var a) && a is System.Collections.IEnumerable list)
@@ -176,9 +191,8 @@ namespace Glassify
                     }
                 LatestTag = tag; LatestUrl = url; AssetUrl = asset; AssetSha256 = sha;
                 Program.Window?.ShowUpdate(tag, url, CanAutoUpdate);
+                return true;
             }
-            catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { /* no releases yet */ }
-            catch (Exception ex) { Program.Log("update check: " + ex.Message); }
         }
 
         /// Can Glassify replace its own files here? (Not if someone put it in Program Files.)
@@ -196,6 +210,11 @@ namespace Glassify
             var swapped = new System.Collections.Generic.List<(string target, string old)>();
             try
             {
+                // ask GitHub again first: the release offered at start-up may have been replaced or removed since
+                bool newer;
+                try { newer = Fetch(); }
+                catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { newer = false; }
+                if (!newer) { Clear(); Program.Log("update: already on the newest version"); Interlocked.Exchange(ref _busy, 0); return; }
                 if (AssetUrl == null || !FolderWritable()) throw new InvalidOperationException("can't update in this folder");
                 Program.Log("updating to " + LatestTag);
                 if (Directory.Exists(work)) Directory.Delete(work, true);

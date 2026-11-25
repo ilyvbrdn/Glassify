@@ -25,7 +25,7 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
 [aria-hidden="true"] > div > #Desktop_PanelContainer_Id { visibility: hidden !important; }
 
 /* top bar */
-[data-testid="global-nav-bar"] { padding-right: 168px !important; }
+[data-testid="global-nav-bar"] { padding-right: var(--ms-ctl-w, 168px) !important; }
 [data-testid="global-nav-bar"] form, [data-testid="home-button"], [data-testid="user-widget-link"] {
   background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94)) !important;
   border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }

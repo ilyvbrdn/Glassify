@@ -157,6 +157,8 @@ namespace Glassify
 
         public void ShowUpdate(string tag, string url, bool auto) => Run("window.__ms && window.__ms.showUpdate(" + Program.Json.Serialize(tag) + "," + Program.Json.Serialize(url) + "," + B(auto) + ")");
 
+        public void HideUpdate() => Run("window.__ms && window.__ms.hideUpdate && window.__ms.hideUpdate()");
+
         /// One-click update didn't work: say so on the button and open the download page instead.
         public void UpdateFailed(string url)
         {

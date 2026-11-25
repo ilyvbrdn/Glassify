@@ -82,7 +82,8 @@ const ms = window.__ms = {
     this.nowPlayingPanel();
     this.resume();
     this.heartbeat();
-    if (this._update && !document.getElementById('ms-update')) this.showUpdate(this._update.tag, this._update.url);
+    if (this._update && !document.getElementById('ms-update')) this.showUpdate(this._update.tag, this._update.url, this._update.auto);
+    this.fitControls();
     this.button();
     this.tag();
     this.clearContent();
@@ -360,13 +361,28 @@ const ms = window.__ms = {
   showUpdate(tag, url, auto) {
     this._update = { tag, url, auto: !!auto };
     const w = document.getElementById('ms-winctl');
-    if (!w || document.getElementById('ms-update')) return;
-    const b = document.createElement('button');
-    b.id = 'ms-update';
+    if (!w) return;
+    let b = document.getElementById('ms-update');
+    if (!b) {
+      b = document.createElement('button');
+      b.id = 'ms-update'; b.innerHTML = '&#xE896;'; b.onclick = () => this.startUpdate();
+      w.insertBefore(b, w.children[1]);
+    }
+    b.classList.remove('ms-busy');
     b.title = auto ? 'Glassify ' + tag + ' is available - click to update (a few seconds, your music keeps playing)'
                    : 'Glassify ' + tag + ' is available - click to open the download page';
-    b.innerHTML = '&#xE896;'; b.onclick = () => this.startUpdate();
-    w.insertBefore(b, w.children[1]);
+    this.fitControls();
+  },
+  hideUpdate() {
+    this._update = null;
+    const b = document.getElementById('ms-update'); if (b) b.remove();
+    this.fitControls();
+  },
+  // the top bar keeps exactly as much room on the right as the window buttons take, so they never cover anything
+  fitControls() {
+    const w = document.getElementById('ms-winctl'); if (!w) return;
+    const px = Math.ceil(w.getBoundingClientRect().width) + 26;
+    if (px > 26 && this._ctlw !== px) { this._ctlw = px; document.documentElement.style.setProperty('--ms-ctl-w', px + 'px'); }
   },
   // one click: Glassify downloads, checks and installs the update, then restarts itself
   startUpdate() {
