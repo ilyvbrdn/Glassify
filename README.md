@@ -1,4 +1,4 @@
-﻿<p align="center"><img src="icon.png" width="128" height="128" alt="Glassify icon"></p>
+<p align="center"><img src="icon.png" width="128" height="128" alt="Glassify icon"></p>
 
 # Glassify
 
@@ -9,7 +9,7 @@ and features for listening while gaming.
 ## Download
 Get **[the latest release](https://github.com/ilyvbrdn/Glassify/releases/latest)**, extract the zip to a folder
 you can write to (not Program Files) and run `Glassify.exe`. On first launch Windows may show
-"Windows protected your PC": click **More info â†’ Run anyway** (the app isn't code-signed).
+"Windows protected your PC": click **More info → Run anyway** (the app isn't code-signed).
 
 ## Why Glassify?
 The official Spotify app for Windows is heavy: it is slow to open, keeps using CPU and memory in the
@@ -19,7 +19,7 @@ a tiny always-on-top mini player, and switches to a click-through "ghost" mini p
 fullscreen game starts. You also choose how it looks: see-through glass, solid or light, in any colours.
 
 ## Screenshots
-**The bar**: the player docked to the top (or bottom) of your screen, with next in queue and your recent playlists
+**The bar**: the player docked to an edge of your screen, with next in queue and your recent playlists
 
 ![The bar](screenshots/glassify-bar.png)
 
@@ -34,11 +34,12 @@ fullscreen game starts. You also choose how it looks: see-through glass, solid o
 Screenshots use a demo library; your own playlists are never part of the app or this repo.
 
 ## Features
-- **Look slider** (gear menu): Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
+- **Settings** (gear menu) in four tabs: Look, Player, Gaming, More.
+- **Look slider**: Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
 - **Colours**: panel colour or a **two-colour gradient** with any angle and a balance slider (it flows across the whole
   window, and the mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
-  the panels or has its own colour and transparency.
-- **One player, two shapes**: a floating **mini player** or a **bar** docked to the top or bottom of the screen.
+  the panels or has its own colour and transparency. The search box and home button follow the gradient too.
+- **One player, two shapes**: a floating **mini player** or a **bar** docked to any edge of the screen.
   Ctrl+Alt+B (or the shape buttons) turns one into the other.
   - **Mini player**: always on top, drag any edge or corner to any size (tall gives a big cover), cover art,
     controls, like, click the bar to seek, mouse wheel for volume, button to open the main player.
@@ -100,7 +101,7 @@ no DRM changes); Glassify only changes the look and window.
 ---
 
 <p align="center">
-  <b>Like Glassify? Give it a â­ star at the top of this page.</b><br>
+  <b>Like Glassify? Give it a ⭐ star at the top of this page.</b><br>
   It helps other people find it, and bug reports and ideas are welcome in
   <a href="https://github.com/ilyvbrdn/Glassify/issues">Issues</a>.
 </p>

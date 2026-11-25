@@ -28,7 +28,8 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
 /* top bar */
 [data-testid="global-nav-bar"] { padding-right: var(--ms-ctl-w, 168px) !important; }
 [data-testid="global-nav-bar"] form, [data-testid="home-button"], [data-testid="user-widget-link"] {
-  background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94)) !important;
+  background: var(--ms-bg-strong, rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94))) !important;
+  background-attachment: var(--ms-bg-attach, scroll) !important;   /* follows the panels' gradient */
   border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }
 [data-testid="search-input"] { background: transparent !important; }
 /* optional top bar background (gear menu > Top bar background): the panels' colour or its own, floating like the panels */
@@ -77,7 +78,7 @@ html.ms-solid [data-testid="now-playing-bar"] {
   background: var(--ms-bg, rgb(var(--ms-rgb, 90,36,72))) !important; background-attachment: var(--ms-bg-attach, scroll) !important;
   border: 0 !important; box-shadow: none !important; border-radius: 8px !important; }
 html.ms-solid [data-testid="global-nav-bar"] form, html.ms-solid [data-testid="home-button"], html.ms-solid [data-testid="user-widget-link"] {
-  background: rgb(var(--ms-rgb, 90,36,72)) !important; border: 0 !important; }
+  background: var(--ms-bg-strong, rgb(var(--ms-rgb, 90,36,72))) !important; background-attachment: var(--ms-bg-attach, scroll) !important; border: 0 !important; }
 html.ms-solid #ms-mini-btn { box-shadow: none; }
 
 /* invisible resize edges */

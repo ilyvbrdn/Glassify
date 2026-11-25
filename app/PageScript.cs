@@ -41,6 +41,10 @@ const BASE=`
 @keyframes ms-pulse { 50% { opacity: .3; } }
 #ms-settings .ms-row { display: flex; justify-content: flex-end; gap: 8px; }
 #ms-settings .ms-edges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+#ms-settings .ms-tabs { display: flex; gap: 3px; margin: -4px -4px 14px; padding: 3px; border-radius: 12px; background: rgb(38,33,44); position: sticky; top: -14px; z-index: 2; box-shadow: 0 6px 10px -6px rgba(0,0,0,.6); }
+#ms-settings .ms-tab { flex: 1; border: 0; border-radius: 9px; padding: 6px 0; background: transparent; color: #cfcfd4; font: inherit; font-size: 12px; cursor: pointer; }
+#ms-settings .ms-tab:hover { background: rgba(255,255,255,.08); color: #fff; }
+#ms-settings .ms-tab.ms-on { background: var(--ms-accent, #ff5fa8); color: var(--ms-accent-ink, #1a0710); font-weight: 600; }
 #ms-settings .ms-angrow { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
 #ms-settings .ms-angrow input { flex: 1; margin: 0; }
 #ms-settings .ms-gprev { width: 34px; height: 34px; border-radius: 9px; border: 1px solid rgba(255,255,255,.3); flex: none; }
@@ -226,6 +230,9 @@ const ms = window.__ms = {
     const flat = lvl <= 2;   // Light: one flat solid colour, nothing extra to paint
     const bg = v.grad && !flat ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + a + '), ' + mid + '%, rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + a + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
     st.setProperty('--ms-bg', bg);
+    // the search box, home button and profile picture: the same colour/gradient, a little more solid
+    const as = Math.min(1, alpha + .12).toFixed(2);
+    st.setProperty('--ms-bg-strong', v.grad && !flat ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + as + '), ' + mid + '%, rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + as + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + as + ')');
     st.setProperty('--ms-bg-attach', v.grad && !flat ? 'fixed' : 'scroll');
     // top bar: the panels' colour/gradient, or its own colour
     st.setProperty('--ms-top-bg', v.topMatch ? bg : 'rgba(' + tr + ',' + tg + ',' + tb + ',' + ((+v.topAlpha >= 0 ? +v.topAlpha : 70) / 100).toFixed(2) + ')');
@@ -292,6 +299,8 @@ const ms = window.__ms = {
     const row = (cls, list, val) => '<div class=""ms-sw ' + cls + '"">' + list.map(c => '<button style=""background:' + c + '"" data-c=""' + c + '"" title=""' + c + '""></button>').join('') +
       '<label class=""ms-pick"" title=""Any colour""><input type=""color"" value=""' + val + '""></label></div>';
     p.innerHTML =
+      '<div class=""ms-tabs"">' + [['look','Look'],['player','Player'],['gaming','Gaming'],['more','More']].map(x => '<button class=""ms-tab"" data-t=""' + x[0] + '"">' + x[1] + '</button>').join('') + '</div>' +
+      '<div class=""ms-page"" data-p=""look"">' +
       '<div class=""ms-h"">Look <span class=""ms-lvlname ms-val""></span></div>' +
       '<input class=""ms-lvl"" type=""range"" min=""2"" max=""5"" step=""1"" value=""' + this.level() + '"">' +
       '<div class=""ms-desc ms-lvldesc""></div>' +
@@ -305,22 +314,24 @@ const ms = window.__ms = {
       '<div class=""ms-topwrap""><label class=""ms-check ms-top""><input type=""checkbox""' + (v.top ? ' checked' : '') + '><span><b>Top bar background</b><br>A glass bar behind the search bar and window buttons</span></label>' +
       '<div class=""ms-topopts""><label class=""ms-check ms-topmatch""><input type=""checkbox""' + (v.topMatch ? ' checked' : '') + '><span><b>Match the panel colour</b><br>Use the panels\' colour (and gradient) for the top bar</span></label><div class=""ms-topcustom""><div class=""ms-h"">Top bar colour</div>' + row('ms-topc', panelSw, v.topColor || '#101014') +
       '<div class=""ms-h"">Top bar transparency <span class=""ms-val ms-topval""></span></div><input class=""ms-toprange"" type=""range"" min=""0"" max=""95"" value=""' + (100 - (+v.topAlpha >= 0 ? +v.topAlpha : 70)) + '""></div></div></div>' +
+      '</div><div class=""ms-page"" data-p=""player"">' +
       '<label class=""ms-check ms-minimin""><input type=""checkbox""' + (v.miniOnMin ? ' checked' : '') + '><span><b>Minimize to mini player</b><br>Minimizing hides the main window and leaves only the mini player</span></label>' +
-      '<div class=""ms-h"">Gaming</div>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""game""><span><b>Automatic game mode</b><br>When a fullscreen game starts, switch to the mini player and low priority; restore after</span></label>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""ghost""><span><b>Ghost mini player in games</b><br>See-through and click-through while gaming, so it never blocks a click</span></label>' +
-      '<div class=""ms-h"">Extras</div>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""toast""><span><b>Song-change popup</b><br>A small popup with the cover when the song changes (when Glassify isn\'t in front)</span></label>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""auto""><span><b>Start with Windows</b></span></label>' +
-      '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
       '<div class=""ms-h"">Player shape</div>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Bar shape</b><br>Turn the mini player into a bar docked to the edge of your screen, with next in queue, recent playlists and search (Ctrl+Alt+B switches)</span></label>' +
       '<div class=""ms-h"">Bar position</div><div class=""ms-edges"">' + [['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']].map(e => '<button class=""ms-pill"" data-e=""' + e[0] + '"">' + e[1] + '</button>').join('') + '</div>' +
       '<div class=""ms-desc"" style=""min-height:0"">Or drag the grip on the bar to any edge of any screen.</div>' +
       '<div class=""ms-monwrap""><div class=""ms-h"">Bar screen</div><select class=""ms-mon"">' + (window.__msMonitors || []).map(m => '<option value=""' + String(m.id).replace(/""/g, '') + '"">' + m.name + '</option>').join('') + '</select></div>' +
+      '</div><div class=""ms-page"" data-p=""gaming"">' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""game""><span><b>Automatic game mode</b><br>When a fullscreen game starts, switch to the mini player and low priority; restore after</span></label>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""ghost""><span><b>Ghost mini player in games</b><br>See-through and click-through while gaming, so it never blocks a click</span></label>' +
+      '</div><div class=""ms-page"" data-p=""more"">' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""toast""><span><b>Song-change popup</b><br>A small popup with the cover when the song changes (when Glassify isn\'t in front)</span></label>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""auto""><span><b>Start with Windows</b></span></label>' +
+      '<label class=""ms-check""><input type=""checkbox"" data-o=""startmini""><span><b>Start in the mini player</b><br>When started with Windows, open as just the mini player</span></label>' +
       '<div class=""ms-h"">Shortcuts</div>' +
       '<div class=""ms-desc ms-keys"">Ctrl+Alt+M &nbsp;mini player<br>Ctrl+Alt+B &nbsp;mini player &harr; bar<br>Ctrl+Alt+G &nbsp;ghost mini player<br>Ctrl+Alt+L &nbsp;like song<br>Ctrl+Alt+&uarr; / &darr; &nbsp;volume<br>Media keys &nbsp;play/pause, next, previous</div>' +
       '<div class=""ms-desc ms-ver""></div>' +
+      '</div>' +
       '<div class=""ms-note""></div>' +
       '<div class=""ms-row""><button class=""ms-reset"">Reset</button><button class=""ms-done"">Done</button></div>';
     const $ = s => p.querySelector(s);
@@ -392,6 +403,15 @@ const ms = window.__ms = {
         post('restart');
       }
     };
+    // tabs: one page at a time; reopens on the page you used last
+    const openTab = name => {
+      this._tab = name;
+      p.querySelectorAll('.ms-tab').forEach(b => b.classList.toggle('ms-on', b.dataset.t === name));
+      p.querySelectorAll('.ms-page').forEach(pg => { pg.style.display = pg.dataset.p === name ? '' : 'none'; });
+      p.scrollTop = 0;
+    };
+    p.querySelectorAll('.ms-tab').forEach(b => b.onclick = () => openTab(b.dataset.t));
+    openTab(this._tab || 'look');
     show();
     document.body.appendChild(p);
   },
