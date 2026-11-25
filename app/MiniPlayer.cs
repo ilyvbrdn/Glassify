@@ -47,7 +47,8 @@ namespace Glassify
         public static void SetEco(bool eco)
         {
             if (!_ready.Wait(3000) || _disp == null) return;
-            _disp.BeginInvoke(new Action(() => _win?.SetInterval(eco ? 3000 : 1000)));
+            _disp.BeginInvoke(new Action(() => { _win?.SetInterval(eco ? 3000 : 1000); _win?.SetLite(eco); }));
+            Bar.SetLite(eco);
         }
 
         // The mini player and the bar are one player in two shapes (Opts.Bar = bar shape). Show / hide / toggle
@@ -381,7 +382,7 @@ namespace Glassify
                 var hwnd = new WindowInteropHelper(this).Handle;
                 HwndSource.FromHwnd(hwnd).CompositionTarget.BackgroundColor = Colors.Transparent;
                 int v = 1; DwmSetWindowAttribute(hwnd, 20, ref v, 4);   // dark
-                v = 3; DwmSetWindowAttribute(hwnd, 38, ref v, 4);       // acrylic glass
+                v = _lite ? 1 : 3; DwmSetWindowAttribute(hwnd, 38, ref v, 4);   // acrylic glass (none in the Light look)
                 v = 2; DwmSetWindowAttribute(hwnd, 33, ref v, 4);       // rounded corners
                 // no Alt+Tab entry
                 SetWindowLong(hwnd, -20, GetWindowLong(hwnd, -20) | 0x80);
@@ -393,6 +394,17 @@ namespace Glassify
         }
 
         public void SetInterval(int ms) => _timer.Interval = TimeSpan.FromMilliseconds(ms);
+
+        // Light look: no glass blur (it costs GPU) and one flat solid colour
+        bool _lite;
+        public void SetLite(bool lite)
+        {
+            if (lite == _lite) return;
+            _lite = lite; _lookKey = null;
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero) { int v = lite ? 1 : 3; DwmSetWindowAttribute(hwnd, 38, ref v, 4); }
+            if (lite) _root.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1A, 0x22));   // until the next colour update
+        }
 
         // ---- ghost mode: see-through-ish and click-through (clicks go to the game underneath) ----
         // Windows won't make the glass (acrylic) mini player click-through, so in ghost mode it swaps itself for a
@@ -465,18 +477,27 @@ namespace Glassify
             _root.LayoutTransform = new ScaleTransform(Scale, Scale);
         }
 
-        void ApplColoursSafe(string pc, string ac, string alpha, string pc2, bool grad, string angle)
+        void ApplColoursSafe(string pc, string ac, string alpha, string pc2, bool grad, string angle, string mid)
         {
             double a = 82; double.TryParse(alpha, NumberStyles.Any, CultureInfo.InvariantCulture, out a);
             double.TryParse(angle, NumberStyles.Any, CultureInfo.InvariantCulture, out var ang);
-            ApplyColours(pc, ac, a, grad ? pc2 : null, ang);
+            if (!double.TryParse(mid, NumberStyles.Any, CultureInfo.InvariantCulture, out var m)) m = 50;
+            ApplyColours(pc, ac, a, grad ? pc2 : null, ang, m);
+        }
+
+        /// A two-colour gradient like the page's: angle in CSS terms, the colours meeting at 'mid' percent.
+        public static Brush Gradient(Color c1, Color c2, double cssAngle, double mid)
+        {
+            var half = Color.FromArgb((byte)((c1.A + c2.A) / 2), (byte)((c1.R + c2.R) / 2), (byte)((c1.G + c2.G) / 2), (byte)((c1.B + c2.B) / 2));
+            var stops = new GradientStopCollection { new GradientStop(c1, 0), new GradientStop(half, Math.Max(0.05, Math.Min(0.95, mid / 100))), new GradientStop(c2, 1) };
+            return new LinearGradientBrush(stops, cssAngle - 90);   // CSS angles start at 'to top', WPF's at 'to the right'
         }
 
         // ---- colours follow your panel / highlight colours from the main player's settings ----
         string _lookKey;
-        void ApplyColours(string panel, string accent, double alpha, string panel2 = null, double angle = 0)
+        void ApplyColours(string panel, string accent, double alpha, string panel2 = null, double angle = 0, double mid = 50)
         {
-            var key = panel + accent + alpha + panel2 + angle;
+            var key = panel + accent + alpha + panel2 + angle + "/" + mid + _lite;
             if (key == _lookKey) return;
             _lookKey = key;
             try
@@ -484,11 +505,12 @@ namespace Glassify
                 var pc = (Color)ColorConverter.ConvertFromString(panel);
                 var ac = (Color)ColorConverter.ConvertFromString(accent);
                 byte a1 = (byte)Math.Max(0x40, Math.Min(0xF0, alpha * 2.2)), a2 = (byte)(a1 / 3);
-                if (panel2 != null)
+                if (_lite) _root.Background = new SolidColorBrush(Color.FromRgb(pc.R, pc.G, pc.B));   // Light: flat and solid
+                else if (panel2 != null)
                 {
                     // the panels' two-colour gradient (CSS angles start at 'to top'; WPF's at 'to the right')
                     var p2 = (Color)ColorConverter.ConvertFromString(panel2);
-                    _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), angle - 90);
+                    _root.Background = Gradient(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), angle, mid);
                 }
                 else _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a2, pc.R, pc.G, pc.B), 35);
                 _play.Background = new SolidColorBrush(ac);
@@ -597,7 +619,7 @@ namespace Glassify
                         try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 512; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
                     }
                     var pc = Program.Str(st, "color"); var ac = Program.Str(st, "accent");
-                    if (pc != null && ac != null) ApplColoursSafe(pc, ac, Program.Str(st, "alpha"), Program.Str(st, "color2"), Program.Str(st, "grad") == "True", Program.Str(st, "angle"));
+                    if (pc != null && ac != null) ApplColoursSafe(pc, ac, Program.Str(st, "alpha"), Program.Str(st, "color2"), Program.Str(st, "grad") == "True", Program.Str(st, "angle"), Program.Str(st, "mid"));
                     var pos = Secs(Program.Str(st, "pos")); var dur = Secs(Program.Str(st, "dur"));
                     if (dur > 0) { _durS = dur; _posS = pos; _at = DateTime.UtcNow; }
                 }

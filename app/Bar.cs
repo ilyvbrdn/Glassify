@@ -47,6 +47,15 @@ namespace Glassify
 
         internal static void Remember(bool shown) { IsShown = shown; if (Opts.BarShown != shown) { Opts.BarShown = shown; Opts.Save(); } }
 
+        /// Light look: no glass blur, flat colour, slower song checks.
+        static volatile bool _liteNow;
+        public static void SetLite(bool lite)
+        {
+            _liteNow = lite;
+            var d = Mini.Disp; if (d == null || _w == null) return;
+            d.BeginInvoke(new Action(() => _w?.SetLite(lite)));
+        }
+
         public static void CloseNow() { try { if (_w != null) { bool was = Opts.BarShown; _w.HideBar(); Opts.BarShown = was; Opts.Save(); _w.Close(); } } catch { } }
 
         static void Run(Action<BarWindow> a)
@@ -54,7 +63,7 @@ namespace Glassify
             var d = Mini.Disp; if (d == null) return;
             d.BeginInvoke(new Action(() =>
             {
-                try { if (_w == null) _w = new BarWindow(); a(_w); }
+                try { if (_w == null) { _w = new BarWindow(); _w.SetLite(_liteNow); } a(_w); }
                 catch (Exception ex) { Program.Log("bar: " + ex); }
             }));
         }
@@ -212,7 +221,7 @@ namespace Glassify
                 _hwnd = new WindowInteropHelper(this).Handle;
                 HwndSource.FromHwnd(_hwnd).CompositionTarget.BackgroundColor = Colors.Transparent;
                 int v = 1; DwmSetWindowAttribute(_hwnd, 20, ref v, 4);   // dark
-                v = 3; DwmSetWindowAttribute(_hwnd, 38, ref v, 4);       // acrylic glass
+                v = _lite ? 1 : 3; DwmSetWindowAttribute(_hwnd, 38, ref v, 4);   // acrylic glass (none in the Light look)
                 v = 1; DwmSetWindowAttribute(_hwnd, 33, ref v, 4);       // square corners: it's a screen edge
                 SetWindowLong(_hwnd, -20, GetWindowLong(_hwnd, -20) | 0x80);   // no Alt+Tab entry
                 HwndSource.FromHwnd(_hwnd).AddHook(Hook);
@@ -667,7 +676,7 @@ namespace Glassify
                         _artUrl = art;
                         try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 80; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
                     }
-                    Colours(Program.Str(st, "color"), Program.Str(st, "accent"), Program.Str(st, "alpha"), Program.Str(st, "grad") == "True" ? Program.Str(st, "color2") : null, Program.Str(st, "angle"));
+                    Colours(Program.Str(st, "color"), Program.Str(st, "accent"), Program.Str(st, "alpha"), Program.Str(st, "grad") == "True" ? Program.Str(st, "color2") : null, Program.Str(st, "angle"), Program.Str(st, "mid"));
                     var dur = Secs(Program.Str(st, "dur")); if (dur > 0) { _durS = dur; _posS = Secs(Program.Str(st, "pos")); _at = DateTime.UtcNow; }
                 }
             }
@@ -686,20 +695,32 @@ namespace Glassify
         static string Time(double s) { var t = TimeSpan.FromSeconds(Math.Max(0, s)); return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss"); }
 
         string _lookKey;
-        void Colours(string panel, string accent, string alpha, string panel2 = null, string angle = null)
+        bool _lite;
+        public void SetLite(bool lite)
+        {
+            if (lite == _lite) return;
+            _lite = lite; _lookKey = null;
+            _timer.Interval = TimeSpan.FromSeconds(lite ? 3 : 1);
+            if (_hwnd != IntPtr.Zero) { int v = lite ? 1 : 3; DwmSetWindowAttribute(_hwnd, 38, ref v, 4); }
+            if (lite) _root.Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1A, 0x22));   // until the next colour update
+        }
+
+        void Colours(string panel, string accent, string alpha, string panel2 = null, string angle = null, string mid = null)
         {
             if (panel == null || accent == null) return;
-            var key = panel + accent + alpha + panel2 + angle; if (key == _lookKey) return; _lookKey = key;
+            var key = panel + accent + alpha + panel2 + angle + "/" + mid + _lite; if (key == _lookKey) return; _lookKey = key;
             try
             {
                 double a = 82; double.TryParse(alpha, NumberStyles.Any, CultureInfo.InvariantCulture, out a);
                 var pc = (Color)ColorConverter.ConvertFromString(panel); var ac = (Color)ColorConverter.ConvertFromString(accent);
                 byte a1 = (byte)Math.Max(0x40, Math.Min(0xF0, a * 2.2));
-                if (panel2 != null)
+                if (_lite) _root.Background = new SolidColorBrush(Color.FromRgb(pc.R, pc.G, pc.B));   // Light: flat and solid
+                else if (panel2 != null)
                 {
                     double.TryParse(angle, NumberStyles.Any, CultureInfo.InvariantCulture, out var ang);
                     var p2 = (Color)ColorConverter.ConvertFromString(panel2);
-                    _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), ang - 90);
+                    if (!double.TryParse(mid, NumberStyles.Any, CultureInfo.InvariantCulture, out var m)) m = 50;
+                    _root.Background = MiniWindow.Gradient(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), ang, m);
                 }
                 else _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb((byte)(a1 / 2), pc.R, pc.G, pc.B), 0);
                 _menuCard.Background = new SolidColorBrush(Color.FromRgb((byte)(pc.R * .45 + 14), (byte)(pc.G * .45 + 12), (byte)(pc.B * .45 + 16)));

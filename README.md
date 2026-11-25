@@ -1,4 +1,4 @@
-<p align="center"><img src="icon.png" width="128" height="128" alt="Glassify icon"></p>
+﻿<p align="center"><img src="icon.png" width="128" height="128" alt="Glassify icon"></p>
 
 # Glassify
 
@@ -9,7 +9,7 @@ and features for listening while gaming.
 ## Download
 Get **[the latest release](https://github.com/ilyvbrdn/Glassify/releases/latest)**, extract the zip to a folder
 you can write to (not Program Files) and run `Glassify.exe`. On first launch Windows may show
-"Windows protected your PC": click **More info → Run anyway** (the app isn't code-signed).
+"Windows protected your PC": click **More info â†’ Run anyway** (the app isn't code-signed).
 
 ## Why Glassify?
 The official Spotify app for Windows is heavy: it is slow to open, keeps using CPU and memory in the
@@ -35,8 +35,8 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 
 ## Features
 - **Look slider** (gear menu): Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
-- **Colours**: panel colour or a **two-colour gradient at any angle** (it flows across the whole window, and the
-  mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
+- **Colours**: panel colour or a **two-colour gradient** with any angle and a balance slider (it flows across the whole
+  window, and the mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
   the panels or has its own colour and transparency.
 - **One player, two shapes**: a floating **mini player** or a **bar** docked to the top or bottom of the screen.
   Ctrl+Alt+B (or the shape buttons) turns one into the other.
@@ -100,7 +100,7 @@ no DRM changes); Glassify only changes the look and window.
 ---
 
 <p align="center">
-  <b>Like Glassify? Give it a ⭐ star at the top of this page.</b><br>
+  <b>Like Glassify? Give it a â­ star at the top of this page.</b><br>
   It helps other people find it, and bug reports and ideas are welcome in
   <a href="https://github.com/ilyvbrdn/Glassify/issues">Issues</a>.
 </p>

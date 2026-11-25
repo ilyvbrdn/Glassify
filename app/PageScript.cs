@@ -81,7 +81,7 @@ const LEVELS = {
   5: ['Glass', 'Floating see-through glass, everything shown.'],
   4: ['Glass, focused', 'Floating glass; Now Playing panel closed.'],
   3: ['Solid', 'Normal solid window: no see-through or glass effects. Now Playing panel closed.'],
-  2: ['Light', 'The lightest: solid, no cover art in lists, animations paused, low priority, memory saver. Every button still works.'] };
+  2: ['Light', 'The lightest: flat solid colours (no glass, gradient or top bar), no cover art in lists, animations paused, low priority, memory saver. Every button still works.'] };
 const glassOf = l => l >= 4, gpuOf = l => true;
 const ms = window.__ms = {
   cssText: CSS,
@@ -186,7 +186,7 @@ const ms = window.__ms = {
   },
   // ---- settings, remembered between launches ----
   look() {
-    let v = { color: '#5a2448', alpha: 82, accent: '#ff5fa8', eco: false, lvl: 5, miniOnMin: false, top: false, topColor: '#101014', topAlpha: 70, topMatch: true, grad: false, color2: '#3b2a6e', angle: 135 };
+    let v = { color: '#5a2448', alpha: 82, accent: '#ff5fa8', eco: false, lvl: 5, miniOnMin: false, top: false, topColor: '#101014', topAlpha: 70, topMatch: true, grad: false, color2: '#3b2a6e', angle: 135, mid: 50 };
     let saved = {}; try { saved = JSON.parse(localStorage.getItem('ms-look') || '{}') || {}; } catch (e) {}
     v = Object.assign(v, saved);
     if (saved.top && saved.topMatch === undefined) v.topMatch = false;   // a top bar set up before 'match' existed keeps its own colour
@@ -222,16 +222,18 @@ const ms = window.__ms = {
     st.setProperty('--ms-top-alpha', ((+v.topAlpha >= 0 ? +v.topAlpha : 70) / 100).toFixed(2));
     // panel background: one colour, or a two-colour gradient at an angle that runs across the whole window
     const [r2, g2, b2] = rgb(v.color2 || v.color), a = alpha.toFixed(2);
-    const bg = v.grad ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + a + '), rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + a + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+    const mid = Math.max(5, Math.min(95, +v.mid >= 0 ? +v.mid : 50));   // where the colours meet: >50 = more of the first colour
+    const flat = lvl <= 2;   // Light: one flat solid colour, nothing extra to paint
+    const bg = v.grad && !flat ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + a + '), ' + mid + '%, rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + a + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
     st.setProperty('--ms-bg', bg);
-    st.setProperty('--ms-bg-attach', v.grad ? 'fixed' : 'scroll');
+    st.setProperty('--ms-bg-attach', v.grad && !flat ? 'fixed' : 'scroll');
     // top bar: the panels' colour/gradient, or its own colour
     st.setProperty('--ms-top-bg', v.topMatch ? bg : 'rgba(' + tr + ',' + tg + ',' + tb + ',' + ((+v.topAlpha >= 0 ? +v.topAlpha : 70) / 100).toFixed(2) + ')');
     const cl = document.documentElement.classList;
     cl.toggle('ms-topbar', !!v.top && glass);
     if (this.fitControls) requestAnimationFrame(() => this.fitControls());
     const eco = lvl <= 2;   // Light level includes the CPU savings (the separate Eco switch was removed: no noticeable effect)
-    const lumAll = v.grad ? (lum + (0.299*r2 + 0.587*g2 + 0.114*b2) / 255) / 2 : lum;
+    const lumAll = v.grad && !flat ? (lum + (0.299*r2 + 0.587*g2 + 0.114*b2) / 255) / 2 : lum;
     cl.toggle('ms-light', lumAll > .62 && (alpha > .55));
     cl.toggle('ms-solid', !glass);
     cl.toggle('ms-lite', lvl <= 2);
@@ -296,7 +298,8 @@ const ms = window.__ms = {
       '<div class=""ms-h"">Panel colour</div>' + row('ms-panel', panelSw, v.color) +
       '<label class=""ms-check ms-gradchk""><input type=""checkbox""' + (v.grad ? ' checked' : '') + '><span><b>Gradient</b><br>Blend the panel colour into a second colour</span></label>' +
       '<div class=""ms-gradopts""><div class=""ms-h"">Second colour</div>' + row('ms-panel2', panelSw, v.color2 || '#3b2a6e') +
-      '<div class=""ms-h"">Angle <span class=""ms-val ms-angval""></span></div><div class=""ms-angrow""><input class=""ms-ang"" type=""range"" min=""0"" max=""359"" step=""1"" value=""' + (((+v.angle || 0) % 360 + 360) % 360) + '""><div class=""ms-gprev"" title=""Preview""></div></div></div>' +
+      '<div class=""ms-h"">Angle <span class=""ms-val ms-angval""></span></div><div class=""ms-angrow""><input class=""ms-ang"" type=""range"" min=""0"" max=""359"" step=""1"" value=""' + (((+v.angle || 0) % 360 + 360) % 360) + '""><div class=""ms-gprev"" title=""Preview""></div></div>' +
+      '<div class=""ms-h"">Balance <span class=""ms-val ms-midval""></span></div><input class=""ms-mid"" type=""range"" min=""5"" max=""95"" step=""1"" value=""' + (+v.mid >= 0 ? +v.mid : 50) + '"" title=""Slide toward a colour to give it more of the panel (double-click: back to the middle)""></div>' +
       '<div class=""ms-alphawrap""><div class=""ms-h"">Transparency <span class=""ms-val ms-alphaval""></span></div><input class=""ms-range"" type=""range"" min=""0"" max=""95"" value=""' + (100 - v.alpha) + '""></div>' +
       '<div class=""ms-h"">Highlight colour</div>' + row('ms-accent', accentSw, v.accent) +
       '<div class=""ms-topwrap""><label class=""ms-check ms-top""><input type=""checkbox""' + (v.top ? ' checked' : '') + '><span><b>Top bar background</b><br>A glass bar behind the search bar and window buttons</span></label>' +
@@ -324,7 +327,7 @@ const ms = window.__ms = {
     const lvlR = $('.ms-lvl'), range = $('.ms-range'), pick = $('.ms-panel input'), apick = $('.ms-accent input');
     const minimin = $('.ms-minimin input'), note = $('.ms-note');
     const topChk = $('.ms-top input'), tpick = $('.ms-topc input'), trange = $('.ms-toprange');
-    const gradChk = $('.ms-gradchk input'), pick2 = $('.ms-panel2 input'), ang = $('.ms-ang'), topMatch = $('.ms-topmatch input');
+    const gradChk = $('.ms-gradchk input'), pick2 = $('.ms-panel2 input'), ang = $('.ms-ang'), topMatch = $('.ms-topmatch input'), midR = $('.ms-mid');
     const needsRestart = () => { const l = +lvlR.value; return glassOf(l) !== glassOf(start) || gpuOf(l) !== gpuOf(start); };
     const show = () => {
       const l = +lvlR.value;
@@ -333,21 +336,28 @@ const ms = window.__ms = {
       $('.ms-alphaval').textContent = range.value + '%';
       $('.ms-alphawrap').classList.toggle('ms-dim', !glassOf(l));
       $('.ms-topwrap').classList.toggle('ms-dim', !glassOf(l));   // glass looks only (solid looks are already opaque)
+      $('.ms-gradchk').classList.toggle('ms-dim', l <= 2);          // Light: flat colours only
+      $('.ms-gradopts').classList.toggle('ms-dim', l <= 2);
       $('.ms-topopts').style.display = topChk.checked ? '' : 'none';
       $('.ms-topcustom').style.display = topMatch.checked ? 'none' : '';
       $('.ms-gradopts').style.display = gradChk.checked ? '' : 'none';
       $('.ms-angval').textContent = ang.value + '\u00B0';
-      $('.ms-gprev').style.background = 'linear-gradient(' + ang.value + 'deg, ' + pick.value + ', ' + pick2.value + ')';
+      const m = +midR.value;
+      $('.ms-midval').textContent = m === 50 ? 'even' : m > 50 ? 'more first colour' : 'more second colour';
+      $('.ms-gprev').style.background = 'linear-gradient(' + ang.value + 'deg, ' + pick.value + ', ' + m + '%, ' + pick2.value + ')';
       $('.ms-topval').textContent = trange.value + '%';
       note.textContent = needsRestart() ? 'Done restarts Glassify (about 3 s) to apply this. Your song keeps going.' : '';
     };
     const save = () => this.setLook({ color: pick.value, alpha: 100 - (+range.value), accent: apick.value, eco: false, lvl: +lvlR.value, miniOnMin: minimin.checked,
                                       top: topChk.checked, topColor: tpick.value, topAlpha: 100 - (+trange.value), topMatch: topMatch.checked,
-                                      grad: gradChk.checked, color2: pick2.value, angle: +ang.value });
+                                      grad: gradChk.checked, color2: pick2.value, angle: +ang.value, mid: +midR.value });
     const update = () => { show(); save(); };
     lvlR.oninput = update; minimin.onchange = update;
     topChk.onchange = update; tpick.oninput = update; trange.oninput = update;
     gradChk.onchange = update; pick2.oninput = update; ang.oninput = update; topMatch.onchange = update;
+    // balance: snaps to the middle when you get close; double-click puts it back in the middle
+    midR.oninput = () => { if (Math.abs(+midR.value - 50) <= 3) midR.value = 50; update(); };
+    midR.ondblclick = () => { midR.value = 50; update(); };
     p.querySelectorAll('.ms-panel2 button').forEach(b => b.onclick = () => { pick2.value = b.dataset.c; update(); });
     p.querySelectorAll('.ms-topc button').forEach(b => b.onclick = () => { tpick.value = b.dataset.c; update(); });
     // gaming & extras switches are app options (saved by Glassify itself, so they work before the page loads)
@@ -372,7 +382,7 @@ const ms = window.__ms = {
     pick.oninput = update; apick.oninput = update; range.oninput = update;
     $('.ms-reset').onclick = () => { lvlR.value = 5; pick.value = '#5a2448'; apick.value = '#ff5fa8'; range.value = 18; minimin.checked = false;
       topChk.checked = false; tpick.value = '#101014'; trange.value = 30; topMatch.checked = true;
-      gradChk.checked = false; pick2.value = '#3b2a6e'; ang.value = 135; update(); };
+      gradChk.checked = false; pick2.value = '#3b2a6e'; ang.value = 135; midR.value = 50; update(); };
     $('.ms-done').onclick = () => {
       p.remove();
       if (+lvlR.value === 5 && start <= 4) { try { localStorage.setItem('ms-npv-open', '1'); } catch (e) {} }
@@ -408,7 +418,7 @@ const ms = window.__ms = {
       pos: (q('[data-testid=""playback-position""]')||{}).textContent || '',
       dur: (q('[data-testid=""playback-duration""]')||{}).textContent || '',
       liked: this.liked(),
-      color: v.color, accent: v.accent, alpha: v.alpha, grad: !!v.grad, color2: v.color2 || v.color, angle: +v.angle || 0
+      color: v.color, accent: v.accent, alpha: v.alpha, grad: !!v.grad && this.level() > 2, lite: this.level() <= 2, color2: v.color2 || v.color, angle: +v.angle || 0, mid: +v.mid >= 0 ? +v.mid : 50
     });
   },
   click(t) { const b = q('[data-testid=""' + t + '""]'); if (b) { b.click(); return 'ok'; } return 'missing'; },
