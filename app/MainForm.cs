@@ -241,7 +241,9 @@ namespace Glassify
             }
             if (msg == "min") { WindowState = FormWindowState.Minimized; return; }
             if (msg == "max") { MaximizedBounds = Screen.FromControl(this).WorkingArea; WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized; return; }
-            if (msg == "close") { Close(); return; }
+            // the window's x: with "Minimize or close to the player" on, it closes into the mini player / bar like the
+            // dash does (quit from the tray icon). Taskbar close, Alt+F4 and Windows shutting down still quit.
+            if (msg == "close") { if (MiniOnMinimize) HideToMini(); else Close(); return; }
             if (msg == "drag")
             {
                 if (WindowState == FormWindowState.Maximized) return;

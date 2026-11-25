@@ -243,7 +243,9 @@ const ms = window.__ms = {
     const eco = lvl <= 2;   // Light level includes the CPU savings (the separate Eco switch was removed: no noticeable effect)
     const lumAll = v.grad && !flat ? (lum + (0.299*r2 + 0.587*g2 + 0.114*b2) / 255) / 2 : lum;
     cl.toggle('ms-light', lumAll > .62 && (alpha > .55));
-    cl.toggle('ms-pill-light', lumAll > .62);   // the mostly solid top-row pills: dark text on light colours
+    cl.toggle('ms-pill-light', lumAll > .62);
+    const xb = q('#ms-winctl .ms-close');   // the x closes to the player when that's switched on
+    if (xb) xb.title = v.miniOnMin ? 'Close to the player (quit from the Glassify icon by the clock)' : 'Close Glassify';   // the mostly solid top-row pills: dark text on light colours
     cl.toggle('ms-solid', !glass);
     cl.toggle('ms-lite', lvl <= 2);
     cl.toggle('ms-eco', eco);
@@ -293,7 +295,7 @@ const ms = window.__ms = {
       '<div class=""ms-topopts""><label class=""ms-check ms-topmatch""><input type=""checkbox""' + (v.topMatch ? ' checked' : '') + '><span><b>Match the panel colour</b><br>Use the panels\' colour (and gradient) for the top bar</span></label><div class=""ms-topcustom""><div class=""ms-h"">Top bar colour</div>' + row('ms-topc', panelSw, v.topColor || '#101014') +
       '<div class=""ms-h"">Top bar transparency <span class=""ms-val ms-topval""></span></div><input class=""ms-toprange"" type=""range"" min=""0"" max=""95"" value=""' + (100 - (+v.topAlpha >= 0 ? +v.topAlpha : 70)) + '""></div></div></div>' +
       '</div><div class=""ms-page"" data-p=""player"">' +
-      '<label class=""ms-check ms-minimin""><input type=""checkbox""' + (v.miniOnMin ? ' checked' : '') + '><span><b>Minimize to mini player</b><br>Minimizing hides the main window and leaves only the mini player</span></label>' +
+      '<label class=""ms-check ms-minimin""><input type=""checkbox""' + (v.miniOnMin ? ' checked' : '') + '><span><b>Minimize or close to the player</b><br>The – and × buttons hide the main window and leave the mini player or bar playing. Quit from the Glassify icon by the clock</span></label>' +
       '<div class=""ms-h"">Player shape</div>' +
       '<label class=""ms-check""><input type=""checkbox"" data-o=""bar""><span><b>Bar shape</b><br>Turn the mini player into a bar docked to the edge of your screen, with next in queue, recent playlists and search (Ctrl+Alt+B switches)</span></label>' +
       '<div class=""ms-h"">Bar position</div><div class=""ms-edges"">' + [['top','Top'],['bottom','Bottom'],['left','Left'],['right','Right']].map(e => '<button class=""ms-pill"" data-e=""' + e[0] + '"">' + e[1] + '</button>').join('') + '</div>' +
