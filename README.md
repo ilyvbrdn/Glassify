@@ -3,61 +3,86 @@
 # Glassify
 
 A light, floating, glass-styled Windows player for Spotify. It runs Spotify's own web player (so playback,
-your library and Premium all work normally) inside a minimal see-through window, with a floating mini player
-and features for listening while gaming.
+your library and Premium all work normally) inside a minimal see-through window, with a player you can shrink
+into a floating card or dock to the edge of your screen, and features for listening while gaming.
+
+![Glassify with a two-colour gradient](screenshots/glassify-gradient.png)
 
 ## Download
 Get **[the latest release](https://github.com/ilyvbrdn/Glassify/releases/latest)**, extract the zip to a folder
-you can write to (not Program Files) and run `Glassify.exe`. On first launch Windows may show
-"Windows protected your PC": click **More info → Run anyway** (the app isn't code-signed).
+you can write to (Documents or Downloads, not Program Files) and run `Glassify.exe`. Sign in to Spotify
+(Premium needed). On first launch Windows may show "Windows protected your PC": click
+**More info → Run anyway** (the app isn't code-signed). After that it updates itself.
 
 ## Why Glassify?
 The official Spotify app for Windows is heavy: it is slow to open, keeps using CPU and memory in the
 background and is hard to keep out of the way while you play games. Glassify is a lighter shell around
-Spotify's own web player. It opens quickly, drops to low priority when you're not looking at it, shrinks to
-a tiny always-on-top mini player, and switches to a click-through "ghost" mini player by itself when a
-fullscreen game starts. You also choose how it looks: see-through glass, solid or light, in any colours.
+Spotify's own web player. It opens quickly, drops to low priority when you're not looking at it, folds into a
+small always-on-top player or a bar on the edge of your screen, and gets out of the way by itself when a
+fullscreen game starts. And you decide how it looks: see-through glass, solid or light, in any colours.
 
-## Screenshots
-**The bar**: the player docked to an edge of your screen, with next in queue and your recent playlists
+## How it looks
+| | |
+|---|---|
+| ![Glass, pink](screenshots/glassify-glass-pink.png) **Glass**: floating see-through panels | ![Settings](screenshots/glassify-settings-blue.png) **Settings**: the gear menu, in four tabs |
+| ![Solid](screenshots/glassify-solid-amber.png) **Solid**: a normal window, any colour | ![Light](screenshots/glassify-light.png) **Light**: the lightest on your PC |
+
+## The player: a card or a bar
+**The bar** docks to the top of your screen with the song, a timeline, next in queue and your recently played playlists:
 
 ![The bar](screenshots/glassify-bar.png)
 
-| | |
-|---|---|
-| ![Glass, pink](screenshots/glassify-glass-pink.png) **Glass** | ![Settings, blue](screenshots/glassify-settings-blue.png) **Settings (gear menu)** |
-| ![Glass, green](screenshots/glassify-focused-green.png) **Glass, green** | ![Solid, amber](screenshots/glassify-solid-amber.png) **Solid** |
-| ![Light](screenshots/glassify-light.png) **Light (lightest on CPU)** | ![The bar's menu](screenshots/glassify-bar-menu.png) **The bar's menu: your library and song search** |
-| ![Mini player, wide](screenshots/glassify-mini-wide.png) **Mini player, any size: wide...** | ![Mini player, tall](screenshots/glassify-mini-tall.png) **...or tall** |
-| ![Mini player](screenshots/glassify-mini.png) **Mini player in three colours** | ![Ghost mini player](screenshots/glassify-ghost.png) **Ghost mini player (while gaming)** |
+| | | |
+|---|---|---|
+| ![The bar's menu](screenshots/glassify-bar-menu.png) **Its menu**: your library | ![Bar search](screenshots/glassify-bar-search.png) **...and song search** | ![The bar on the side](screenshots/glassify-bar-side.png) **On the left or right** it becomes a sidebar |
+| ![Mini player, wide](screenshots/glassify-mini-wide.png) **The mini player**, any size: wide... | ![Mini player, tall](screenshots/glassify-mini-tall.png) **...or tall** with a big cover | ![Ghost mini player](screenshots/glassify-ghost.png) **Ghost mode** while gaming: see-through and click-through |
 
 Screenshots use a demo library; your own playlists are never part of the app or this repo.
 
-## Features
-- **Settings** (gear menu) in four tabs: Look, Player, Gaming, More.
-- **Look slider**: Glass, Solid, Light. Light is the lightest on CPU.
-- **Colours**: panel colour or a **two-colour gradient** with any angle and a balance slider (it flows across the whole
-  window, and the mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
-  the panels or has its own colour and transparency. The search box and home button follow the gradient too.
-- **One player, two shapes**: a floating **mini player** or a **bar** docked to any edge of the screen.
-  Ctrl+Alt+B (or the shape buttons) turns one into the other.
-  - **Mini player**: always on top, drag any edge or corner to any size (tall gives a big cover), cover art,
-    controls, like, click the bar to seek, mouse wheel for volume, button to open the main player.
-  - **Bar**: docks to the **top, bottom, left or right** edge of **any screen** (drag its grip to an edge, or
-    pick in the gear menu). Takes its space like the taskbar (windows make room for it), steps aside for
-    fullscreen games, shows the song, a timeline with the like button, **next in queue** and your **recently
-    played playlists**; on the left or right it becomes a sidebar with a big cover. Its menu lists your library
-    and searches songs. Adapts to any screen, from laptops to ultra-wides.
-- **Minimize to the player**: minimizing hides the main window and leaves the player; a tray icon by the clock
-  shows Glassify is still running.
-- **Automatic game mode**: when a fullscreen game starts, switches to the player and low priority;
-  restores everything when the game closes. Screenshot tools and fullscreen videos don't count as games.
-- **Ghost mini player**: see-through and click-through while gaming (Ctrl+Alt+G any time).
-- **Song-change popup** (optional), **start with Windows** (optional, can start straight into the player).
-- **Crash recovery**: if Spotify's page crashes it reloads and keeps playing.
-- **Automatic updates**: checks this repo's latest GitHub Release a few seconds after starting and every 2 hours,
-  and installs it by itself in seconds (never during a game), keeping your login, settings and music. Can be
-  switched off in Settings > More; then the update button installs it in one click.
+## Features, explained
+
+### Looks and colours (Settings > Look)
+- **Look slider: Glass, Solid, Light.** Glass is the floating see-through style. Solid is a normal opaque
+  window (cheaper to draw). Light is the lightest on CPU and memory: one flat colour, no cover art in lists,
+  animations paused, low priority. Every button still works in every look.
+- **Panel colour** from the swatches or any colour you pick, and **transparency** for the glass.
+- **Gradient**: blend the panel colour into a second colour, at any **angle**, with a **balance** slider for
+  which colour dominates (it snaps to the middle, double-click resets). One continuous gradient runs across
+  the whole window, the search box and home button included, and the mini player and bar follow it.
+- **Highlight colour** instead of Spotify green (play buttons, the song that's playing, progress bars).
+- **Top bar background**: an optional glass bar behind the search box and window buttons, matching the
+  panels or with its own colour and transparency.
+- Light colours automatically get dark text, so everything stays readable.
+
+### One player, two shapes (Settings > Player)
+- **Mini player**: a small always-on-top card with the cover, song, controls, like button and a seek bar.
+  Drag any edge or corner to any size; tall gives a big cover. Mouse wheel changes the volume.
+- **Bar**: docks to the **top, bottom, left or right** edge of **any screen** (drag its grip to an edge, or
+  pick the position and screen in Settings). Other windows make room for it, like the taskbar, and it steps
+  aside for fullscreen games. It shows the song, a timeline with the like button, **next in queue** (click to
+  skip to it) and your **recently played** playlists (click to play). On the left or right it becomes a
+  sidebar with a big cover. Its **menu** lists your whole library and **searches songs**. It adapts to any
+  screen, from laptops to ultra-wides.
+- **Ctrl+Alt+B** (or the shape button) turns one shape into the other; Ctrl+Alt+M shows or hides it.
+- **Minimize or close to the player**: with this on, the – and × buttons hide the main window and leave the
+  player playing. Quit from the Glassify icon by the clock (or Alt+F4). Hiding the player too leaves Glassify
+  on the taskbar, so it never looks closed.
+
+### Gaming (Settings > Gaming)
+- **Automatic game mode**: when a fullscreen game starts, Glassify hides the main window, shows the player and
+  drops to low priority so the game comes first; everything comes back when the game closes. Browsers,
+  fullscreen videos and screenshot tools don't count as games.
+- **Ghost mini player**: during games the mini player turns see-through and click-through, so it never blocks
+  a click (Ctrl+Alt+G any time).
+
+### Everything else (Settings > More)
+- **Song-change popup** (optional): a small popup with the cover when the song changes and Glassify isn't in front.
+- **Start with Windows** (optional), and **start in the mini player** if you like.
+- **Automatic updates**: checks for a new version a few seconds after starting and every 2 hours, installs it
+  in seconds with your music still playing, and never during a game. Your login and settings are kept. Can be
+  switched off; then an update button installs it in one click.
+- **Crash recovery**: if Spotify's page crashes, Glassify reloads it and keeps playing.
+- **Light on your PC**: low priority and memory saver whenever Glassify is minimized or a game is running.
 
 ## Shortcuts
 | Keys | Action |
@@ -65,7 +90,7 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 | Ctrl+Alt+M | show / hide the player |
 | Ctrl+Alt+B | switch the player between mini player and bar |
 | Ctrl+Alt+G | ghost (click-through) mini player |
-| Ctrl+Alt+L | like current song |
+| Ctrl+Alt+L | like the current song |
 | Ctrl+Alt+Up / Down | volume |
 | Media keys | play/pause, next, previous |
 
@@ -87,14 +112,14 @@ Your login and settings live in a `data` folder next to the exe. **Never share o
 1. Bump `Version` in `app/Program.cs` and `app/Glassify.csproj`.
 2. Build, then zip a `Glassify` folder holding `Glassify.exe`, its DLLs, the `runtimes` folder and `theme.css`
    (never `data`).
-3. Create a GitHub Release with a higher tag (like `v1.1.0`) and attach the zip.
+3. Create a GitHub Release with a higher tag (like `v1.2`) and attach the zip.
 
 Running copies check a few seconds after starting and every 2 hours, then install it automatically (or, with
 automatic updates off, show an update button at the top right). The update downloads the zip from this
 repo's releases, checks it against GitHub's SHA-256 fingerprint, swaps the program files (the `data` folder with
 the login and settings is never touched) and restarts with the music still playing. If anything goes wrong it
-puts the old files back and opens the release page instead. If Glassify can't write to its own folder (for
-example under Program Files) the button just opens the release page.
+puts the old files back. If Glassify can't write to its own folder (for example under Program Files) the
+button just opens the release page.
 
 ## Notes
 Not affiliated with Spotify. Uses Spotify's official web player unmodified (no ad blocking, no downloading,
