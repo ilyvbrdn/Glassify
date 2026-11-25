@@ -187,6 +187,8 @@ const ms = window.__ms = {
     w.querySelectorAll('button').forEach(b => b.onclick = () => b.dataset.a === 'settings' ? this.toggleSettings() : post(b.dataset.a));
     w.querySelector('.ms-grip').addEventListener('mousedown', e => { if (e.button === 0) { e.preventDefault(); post('drag'); } });
     document.body.appendChild(w);
+    const xb = w.querySelector('.ms-close');   // recreated buttons keep the right tooltip for the x
+    if (this.spotify && this.look().miniOnMin) xb.title = 'Close to the player (quit from the Glassify icon by the clock)';
   },
   // ---- settings, remembered between launches ----
   look() {
@@ -554,21 +556,32 @@ const ms = window.__ms = {
     }, 15000);
     return 'started';
   },
+  // Spotify sometimes leaves the main area blank after switching pages. If it's still blank 4 s in, go home and
+  // (0.8 s later, so Spotify really redraws) back to the page, once. Returns true while that's in progress.
+  retrier(path) {
+    let phase = 0, at = 0;
+    return elapsed => {
+      if (phase === 0 && elapsed > 4000) { phase = 1; at = elapsed; this.go('/'); return true; }
+      if (phase === 1) { if (elapsed - at < 800) return true; phase = 2; this.go(path); return true; }
+      return false;
+    };
+  },
   // Play something from your library: open its page and press its play button (the one named after it).
   playUri(uri, name) {
     const m = /^spotify:(playlist|album|artist|show):([A-Za-z0-9]+)$/.exec(uri || '');
     const path = uri === 'spotify:collection:tracks' ? '/collection/tracks' : m ? '/' + m[1] + '/' + m[2] : null;
     if (!path) return 'unsupported';
     this.go(path);
-    const want = (name || '').toLowerCase(), t0 = Date.now();
+    const want = (name || '').toLowerCase(), t0 = Date.now(), retry = this.retrier(path);
     this.job('play', expired => {
       const b = document.querySelector('#main-view [data-testid=action-bar-row] [data-testid=play-button]');
+      if (!b && retry(Date.now() - t0)) return false;   // page stayed blank: opening it again
       if (!b || location.pathname !== path) return expired;
       const label = (b.getAttribute('aria-label') || '').toLowerCase();
       if (want && !label.includes(want) && Date.now() - t0 < 4000 && !expired) return false;   // still the previous page's button
       if (!/pause/.test(label)) b.click();
       return true;
-    }, 9000);
+    }, 11000);
     return 'ok';
   },
   // Search songs: open Spotify's song results for the words and read the first rows.
@@ -579,11 +592,14 @@ const ms = window.__ms = {
     const path = '/search/' + encodeURIComponent(q) + '/tracks';
     const same = location.pathname === path;
     this.go(path);
-    const t0 = Date.now();
+    const t0 = Date.now(), retry = this.retrier(path);
     this.job('find', expired => {
       const rows = [...document.querySelectorAll(rowSel)];
       const ready = rows.length && (same || rows[0].textContent !== before || Date.now() - t0 > 3500);
+      if (!rows.length && retry(Date.now() - t0)) return false;   // page stayed blank: opening it again
       if (!ready && !expired) return false;
+      // nothing came back: a real 'no results' page, or a page that never loaded (then say so, not 'no songs')
+      if (!rows.length && !this.noResults()) { window.__msFind = { state: 'error', q, error: 'search page did not load' }; return true; }
       const items = rows.slice(0, 40).map((r, i) => {
         const t = r.querySelector('a[data-testid=internal-track-link]') || r.querySelector('[aria-colindex=""2""] .encore-internal-color-text-base');
         const artists = [...r.querySelectorAll('a[href^=""/artist/""]')].map(a => a.textContent.trim()).filter(Boolean);
@@ -592,9 +608,10 @@ const ms = window.__ms = {
       }).filter(x => x.name);
       window.__msFind = { state: 'done', q, items };
       return true;
-    }, 9000);
+    }, 11000);
     return 'started';
   },
+  noResults() { const m = document.querySelector('#main-view'); return !!m && /no results found/i.test(m.innerText || ''); },
   playFound(i) {
     const r = document.querySelectorAll('#main-view [data-testid=tracklist-row]')[i];
     if (!r) return 'gone';

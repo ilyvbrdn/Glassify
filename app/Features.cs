@@ -158,6 +158,12 @@ namespace Glassify
             bool newer = false;
             try { newer = Fetch(); }
             catch (WebException ex) when ((ex.Response as HttpWebResponse)?.StatusCode == HttpStatusCode.NotFound) { Clear(); /* no releases */ }
+            catch (WebException ex) when ((int?)(ex.Response as HttpWebResponse)?.StatusCode == 403 || (int?)(ex.Response as HttpWebResponse)?.StatusCode == 429)
+            {
+                // GitHub's hourly limit for anonymous checks: just wait for the next regular check
+                Program.Log("update check: GitHub says try later");
+                return;
+            }
             catch (Exception ex)
             {
                 Program.Log("update check: " + ex.Message);

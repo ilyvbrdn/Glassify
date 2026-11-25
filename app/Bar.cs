@@ -449,7 +449,7 @@ namespace Glassify
                 {
                     _title.Text = name; _artist.Text = "Starting...";
                     await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(uri) + "," + Program.Json.Serialize(name) + ")");
-                    await PumpFor(9000);
+                    await PumpFor(12000);
                     await Task.Delay(800); await Refresh();
                 };
                 _recents.Children.Add(tile);
@@ -647,7 +647,7 @@ namespace Glassify
                     _popup.IsOpen = false;
                     _title.Text = name; _artist.Text = songs ? sub : "Starting...";
                     if (songs) await Program.Eval("window.__ms && __ms.playFound(" + Convert.ToString(item.TryGetValue("i", out var i) ? i : 0, CultureInfo.InvariantCulture) + ")");
-                    else { await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(Program.Str(item, "uri")) + "," + Program.Json.Serialize(name) + ")"); await PumpFor(9000); }
+                    else { await Program.Eval("window.__ms && __ms.playUri(" + Program.Json.Serialize(Program.Str(item, "uri")) + "," + Program.Json.Serialize(name) + ")"); await PumpFor(12000); }
                     await Task.Delay(800); await Refresh();
                 };
                 _list.Children.Add(row);

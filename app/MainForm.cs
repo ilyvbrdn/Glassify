@@ -41,7 +41,7 @@ namespace Glassify
             try { using (var s = typeof(MainForm).Assembly.GetManifestResourceStream("app.ico")) Icon = new Icon(s); } catch { }
             RestoreBounds_();
             Controls.Add(_web);
-            Load += async (s, e) => { if (!_loadedEarly) { _loadedEarly = true; await Init(); } };
+            Load += async (s, e) => { if (!_loadedEarly) { _loadedEarly = true; await SafeInit(); } };
             HandleCreated += (s, e) => { try { File.WriteAllText(Path.Combine(Program.Data, "main.hwnd"), Handle.ToInt64().ToString()); } catch { } };
             FormClosing += async (s, e) =>
             {
@@ -153,7 +153,13 @@ namespace Glassify
             base.SetVisibleCore(value);
         }
         bool _loadedEarly;
-        void Load_() { if (_loadedEarly) return; _loadedEarly = true; BeginInvoke(new Action(async () => { try { await Init(); } catch (Exception ex) { Program.Log("start-up failed: " + ex); } })); }
+        void Load_() { if (_loadedEarly) return; _loadedEarly = true; BeginInvoke(new Action(async () => await SafeInit())); }
+        // Closed while the browser engine was still starting (quit right after opening): it reports "aborted"; that's fine.
+        async Task SafeInit()
+        {
+            try { await Init(); }
+            catch (Exception ex) { if (!_shuttingDown) Program.Log("start-up failed: " + ex); }
+        }
 
         public void HideToMini()
         {
