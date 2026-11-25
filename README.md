@@ -35,8 +35,9 @@ Screenshots use a demo library; your own playlists are never part of the app or 
 
 ## Features
 - **Look slider** (gear menu): Glass, Glass focused, Solid, Light. Light is the lightest on CPU.
-- **Colours**: panel colour, transparency and highlight colour, plus an optional glass top bar with its own
-  colour and transparency.
+- **Colours**: panel colour or a **two-colour gradient at any angle** (it flows across the whole window, and the
+  mini player and bar follow it), transparency and highlight colour, plus an optional glass top bar that matches
+  the panels or has its own colour and transparency.
 - **One player, two shapes**: a floating **mini player** or a **bar** docked to the top or bottom of the screen.
   Ctrl+Alt+B (or the shape buttons) turns one into the other.
   - **Mini player**: always on top, drag any edge or corner to any size (tall gives a big cover), cover art,

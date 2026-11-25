@@ -465,17 +465,18 @@ namespace Glassify
             _root.LayoutTransform = new ScaleTransform(Scale, Scale);
         }
 
-        void ApplColoursSafe(string pc, string ac, string alpha)
+        void ApplColoursSafe(string pc, string ac, string alpha, string pc2, bool grad, string angle)
         {
             double a = 82; double.TryParse(alpha, NumberStyles.Any, CultureInfo.InvariantCulture, out a);
-            ApplyColours(pc, ac, a);
+            double.TryParse(angle, NumberStyles.Any, CultureInfo.InvariantCulture, out var ang);
+            ApplyColours(pc, ac, a, grad ? pc2 : null, ang);
         }
 
         // ---- colours follow your panel / highlight colours from the main player's settings ----
         string _lookKey;
-        void ApplyColours(string panel, string accent, double alpha)
+        void ApplyColours(string panel, string accent, double alpha, string panel2 = null, double angle = 0)
         {
-            var key = panel + accent + alpha;
+            var key = panel + accent + alpha + panel2 + angle;
             if (key == _lookKey) return;
             _lookKey = key;
             try
@@ -483,7 +484,13 @@ namespace Glassify
                 var pc = (Color)ColorConverter.ConvertFromString(panel);
                 var ac = (Color)ColorConverter.ConvertFromString(accent);
                 byte a1 = (byte)Math.Max(0x40, Math.Min(0xF0, alpha * 2.2)), a2 = (byte)(a1 / 3);
-                _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a2, pc.R, pc.G, pc.B), 35);
+                if (panel2 != null)
+                {
+                    // the panels' two-colour gradient (CSS angles start at 'to top'; WPF's at 'to the right')
+                    var p2 = (Color)ColorConverter.ConvertFromString(panel2);
+                    _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), angle - 90);
+                }
+                else _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a2, pc.R, pc.G, pc.B), 35);
                 _play.Background = new SolidColorBrush(ac);
                 double lum = (0.299 * ac.R + 0.587 * ac.G + 0.114 * ac.B) / 255;
                 _play.Foreground = lum > .55 ? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)) : Brushes.White;
@@ -590,7 +597,7 @@ namespace Glassify
                         try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 512; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
                     }
                     var pc = Program.Str(st, "color"); var ac = Program.Str(st, "accent");
-                    if (pc != null && ac != null) ApplColoursSafe(pc, ac, Program.Str(st, "alpha"));
+                    if (pc != null && ac != null) ApplColoursSafe(pc, ac, Program.Str(st, "alpha"), Program.Str(st, "color2"), Program.Str(st, "grad") == "True", Program.Str(st, "angle"));
                     var pos = Secs(Program.Str(st, "pos")); var dur = Secs(Program.Str(st, "dur"));
                     if (dur > 0) { _durS = dur; _posS = pos; _at = DateTime.UtcNow; }
                 }

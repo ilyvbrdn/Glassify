@@ -13,7 +13,8 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
 
 /* the floating panels: one solid colour + transparency */
 #Desktop_LeftSidebar_Id > nav, #main-view, #Desktop_PanelContainer_Id, [data-testid="now-playing-bar"] {
-  background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha, .82)) !important;
+  background: var(--ms-bg, rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha, .82))) !important;
+  background-attachment: var(--ms-bg-attach, scroll) !important;   /* fixed for a gradient: one gradient across the whole window */
   border: 1px solid rgba(255,255,255,.13) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
   border-radius: 22px !important; }
@@ -30,9 +31,10 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
   background: rgba(var(--ms-rgb, 90,36,72), var(--ms-alpha-strong, .94)) !important;
   border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }
 [data-testid="search-input"] { background: transparent !important; }
-/* optional top bar background (gear menu > Top bar background): its own colour + transparency, floating like the panels */
+/* optional top bar background (gear menu > Top bar background): the panels' colour or its own, floating like the panels */
 html.ms-topbar [data-testid="global-nav-bar"] {
-  background: rgba(var(--ms-top-rgb, 16,16,20), var(--ms-top-alpha, .7)) !important;
+  background: var(--ms-top-bg, rgba(var(--ms-top-rgb, 16,16,20), var(--ms-top-alpha, .7))) !important;
+  background-attachment: var(--ms-bg-attach, scroll) !important;
   border: 1px solid rgba(255,255,255,.13) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.18) !important;
   border-radius: 22px !important; margin: 6px 8px 0 !important; }
 
@@ -72,7 +74,8 @@ html.ms-light #main-view[data-ms-photo] [data-testid="entity-header"] { --text-b
 html.ms-solid, html.ms-solid body { background: rgb(var(--ms-rgb-dark, 28,20,30)) !important; }
 html.ms-solid #Desktop_LeftSidebar_Id > nav, html.ms-solid #main-view, html.ms-solid #Desktop_PanelContainer_Id,
 html.ms-solid [data-testid="now-playing-bar"] {
-  background: rgb(var(--ms-rgb, 90,36,72)) !important; border: 0 !important; box-shadow: none !important; border-radius: 8px !important; }
+  background: var(--ms-bg, rgb(var(--ms-rgb, 90,36,72))) !important; background-attachment: var(--ms-bg-attach, scroll) !important;
+  border: 0 !important; box-shadow: none !important; border-radius: 8px !important; }
 html.ms-solid [data-testid="global-nav-bar"] form, html.ms-solid [data-testid="home-button"], html.ms-solid [data-testid="user-widget-link"] {
   background: rgb(var(--ms-rgb, 90,36,72)) !important; border: 0 !important; }
 html.ms-solid #ms-mini-btn { box-shadow: none; }

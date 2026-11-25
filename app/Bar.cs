@@ -667,7 +667,7 @@ namespace Glassify
                         _artUrl = art;
                         try { var bi = new BitmapImage(); bi.BeginInit(); bi.UriSource = new Uri(art); bi.DecodePixelWidth = 80; bi.CacheOption = BitmapCacheOption.OnLoad; bi.EndInit(); _art.Source = bi; } catch { }
                     }
-                    Colours(Program.Str(st, "color"), Program.Str(st, "accent"), Program.Str(st, "alpha"));
+                    Colours(Program.Str(st, "color"), Program.Str(st, "accent"), Program.Str(st, "alpha"), Program.Str(st, "grad") == "True" ? Program.Str(st, "color2") : null, Program.Str(st, "angle"));
                     var dur = Secs(Program.Str(st, "dur")); if (dur > 0) { _durS = dur; _posS = Secs(Program.Str(st, "pos")); _at = DateTime.UtcNow; }
                 }
             }
@@ -686,16 +686,22 @@ namespace Glassify
         static string Time(double s) { var t = TimeSpan.FromSeconds(Math.Max(0, s)); return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss"); }
 
         string _lookKey;
-        void Colours(string panel, string accent, string alpha)
+        void Colours(string panel, string accent, string alpha, string panel2 = null, string angle = null)
         {
             if (panel == null || accent == null) return;
-            var key = panel + accent + alpha; if (key == _lookKey) return; _lookKey = key;
+            var key = panel + accent + alpha + panel2 + angle; if (key == _lookKey) return; _lookKey = key;
             try
             {
                 double a = 82; double.TryParse(alpha, NumberStyles.Any, CultureInfo.InvariantCulture, out a);
                 var pc = (Color)ColorConverter.ConvertFromString(panel); var ac = (Color)ColorConverter.ConvertFromString(accent);
                 byte a1 = (byte)Math.Max(0x40, Math.Min(0xF0, a * 2.2));
-                _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb((byte)(a1 / 2), pc.R, pc.G, pc.B), 0);
+                if (panel2 != null)
+                {
+                    double.TryParse(angle, NumberStyles.Any, CultureInfo.InvariantCulture, out var ang);
+                    var p2 = (Color)ColorConverter.ConvertFromString(panel2);
+                    _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb(a1, p2.R, p2.G, p2.B), ang - 90);
+                }
+                else _root.Background = new LinearGradientBrush(Color.FromArgb(a1, pc.R, pc.G, pc.B), Color.FromArgb((byte)(a1 / 2), pc.R, pc.G, pc.B), 0);
                 _menuCard.Background = new SolidColorBrush(Color.FromRgb((byte)(pc.R * .45 + 14), (byte)(pc.G * .45 + 12), (byte)(pc.B * .45 + 16)));
                 _play.Background = new SolidColorBrush(ac);
                 _play.Foreground = (0.299 * ac.R + 0.587 * ac.G + 0.114 * ac.B) / 255 > .55 ? new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14)) : Brushes.White;
