@@ -32,6 +32,13 @@ html, body, #main, [data-testid="root"], [data-ms-wrap], [data-testid="global-na
   background-attachment: var(--ms-bg-attach, scroll) !important;   /* follows the panels' gradient */
   border: 1px solid rgba(255,255,255,.13) !important; border-radius: 999px !important; }
 [data-testid="search-input"] { background: transparent !important; }
+/* light pill colours: dark text and icons inside them (the pills are mostly solid, so this is always readable) */
+html.ms-pill-light [data-testid="global-nav-bar"] form, html.ms-pill-light [data-testid="home-button"] {
+  --text-base: #141414 !important; --text-subdued: #4a4a4a !important; --essential-base: #141414 !important;
+  --essential-subdued: #5f5f5f !important; --background-highlight: rgba(0,0,0,.07) !important;
+  color: #141414 !important; border-color: rgba(0,0,0,.14) !important; }
+html.ms-pill-light [data-testid="global-nav-bar"] form *, html.ms-pill-light [data-testid="home-button"] * { color: #2a2a2a !important; }
+html.ms-pill-light [data-testid="search-input"]::placeholder { color: #5a5a5a !important; opacity: 1 !important; }
 /* optional top bar background (gear menu > Top bar background): the panels' colour or its own, floating like the panels */
 html.ms-topbar [data-testid="global-nav-bar"] {
   background: var(--ms-top-bg, rgba(var(--ms-top-rgb, 16,16,20), var(--ms-top-alpha, .7))) !important;

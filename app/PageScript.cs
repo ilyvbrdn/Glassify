@@ -230,8 +230,9 @@ const ms = window.__ms = {
     const flat = lvl <= 2;   // Light: one flat solid colour, nothing extra to paint
     const bg = v.grad && !flat ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + a + '), ' + mid + '%, rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + a + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
     st.setProperty('--ms-bg', bg);
-    // the search box, home button and profile picture: the same colour/gradient, a little more solid
-    const as = Math.min(1, alpha + .12).toFixed(2);
+    // the search box, home button and profile picture: the same colour/gradient but mostly solid at any
+    // transparency, so they stay readable over whatever is behind the window (text colour set below)
+    const as = Math.min(1, Math.max(.84, alpha + .12)).toFixed(2);
     st.setProperty('--ms-bg-strong', v.grad && !flat ? 'linear-gradient(' + (((+v.angle || 0) % 360 + 360) % 360) + 'deg, rgba(' + r + ',' + g + ',' + b + ',' + as + '), ' + mid + '%, rgba(' + r2 + ',' + g2 + ',' + b2 + ',' + as + '))' : 'rgba(' + r + ',' + g + ',' + b + ',' + as + ')');
     st.setProperty('--ms-bg-attach', v.grad && !flat ? 'fixed' : 'scroll');
     // top bar: the panels' colour/gradient, or its own colour
@@ -242,6 +243,7 @@ const ms = window.__ms = {
     const eco = lvl <= 2;   // Light level includes the CPU savings (the separate Eco switch was removed: no noticeable effect)
     const lumAll = v.grad && !flat ? (lum + (0.299*r2 + 0.587*g2 + 0.114*b2) / 255) / 2 : lum;
     cl.toggle('ms-light', lumAll > .62 && (alpha > .55));
+    cl.toggle('ms-pill-light', lumAll > .62);   // the mostly solid top-row pills: dark text on light colours
     cl.toggle('ms-solid', !glass);
     cl.toggle('ms-lite', lvl <= 2);
     cl.toggle('ms-eco', eco);
