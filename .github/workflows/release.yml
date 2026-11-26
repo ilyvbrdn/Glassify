@@ -1,0 +1,87 @@
+# Builds Glassify on GitHub's Windows machines and publishes the release, so an update can go out without a PC.
+#
+# Publish: bump the version in app/Program.cs and app/Glassify.csproj, write .github/release-notes.md, commit,
+#          then push a tag that matches the version (for example v1.2).
+# Dry run: Actions tab > "Build and release" > Run workflow. Builds and packages the zip (downloadable from the run)
+#          without publishing anything.
+name: Build and release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read and check the version
+        id: ver
+        shell: pwsh
+        run: |
+          $prog = (Select-String app/Program.cs -Pattern 'const string Version = "([0-9.]+)"').Matches[0].Groups[1].Value
+          $proj = ([xml](Get-Content app/Glassify.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          function Pad($v) { $p = $v.Split('.'); while ($p.Count -lt 3) { $p += '0' }; $p -join '.' }
+          if ((Pad $prog) -ne (Pad $proj)) { throw "Version mismatch: Program.cs says $prog, Glassify.csproj says $proj" }
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $tagVer = $env:GITHUB_REF_NAME.TrimStart('v')
+            # the app compares this tag with its own version: they must match, or every copy would update in a loop
+            if ($tagVer -ne $prog) { throw "Tag $env:GITHUB_REF_NAME doesn't match the app version $prog (tag it v$prog)" }
+            $latest = gh release view --repo $env:GITHUB_REPOSITORY --json tagName -q .tagName 2>$null
+            if ($latest -and ([version](Pad $tagVer.Trim()) -le [version](Pad $latest.TrimStart('v')))) { throw "v$tagVer isn't newer than the current release $latest" }
+          }
+          "version=$prog" >> $env:GITHUB_OUTPUT
+          "Building Glassify $prog"
+
+      - name: Build
+        run: dotnet build app/Glassify.csproj -c Release -o build
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          New-Item -ItemType Directory -Force pack/Glassify | Out-Null
+          Copy-Item build/* pack/Glassify -Recurse
+          Copy-Item theme.css pack/Glassify
+          Copy-Item 'tools/HOW TO START.txt' pack/Glassify
+          if (Test-Path pack/Glassify/data) { throw "The package must never contain a data folder" }
+          $exe = (Get-Item pack/Glassify/Glassify.exe).VersionInfo.FileVersion
+          if (-not $exe.StartsWith(((('{0}.0.0' -f $v).Split('.') | Select-Object -First 3) -join '.'))) { throw "Built exe is version $exe, expected $v" }
+          Compress-Archive -Path pack/Glassify -DestinationPath "Glassify-v$v.zip"
+          "Packaged Glassify-v$v.zip (exe $exe):"
+          Get-ChildItem pack/Glassify -Recurse -File | ForEach-Object { '  ' + $_.FullName.Substring((Resolve-Path pack/Glassify).Path.Length + 1) }
+
+      - name: Keep the zip with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Glassify-v${{ steps.ver.outputs.version }}
+          path: Glassify-v${{ steps.ver.outputs.version }}.zip
+
+      - name: Publish the release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $notes = '.github/release-notes.md'
+          if (-not (Test-Path $notes)) { throw "Write $notes before releasing" }
+          gh release create "v$v" "Glassify-v$v.zip" --repo $env:GITHUB_REPOSITORY --title "Glassify $v" --notes-file $notes --latest
+          if ($LASTEXITCODE -ne 0) { throw "Publishing failed" }
+
+      - name: Remove older releases (only the newest is listed)
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $keep = $env:GITHUB_REF_NAME
+          $tags = gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName -q '.[].tagName'
+          foreach ($t in $tags) { if ($t -and $t -ne $keep) { gh release delete $t --repo $env:GITHUB_REPOSITORY --cleanup-tag --yes; "Removed $t" } }
