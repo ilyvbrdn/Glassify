@@ -119,10 +119,19 @@ sheet for checking every size, which isn't committed).
 Your login and settings live in a `data` folder next to the exe. **Never share or commit `data`.**
 
 ## Releasing an update
-1. Bump `Version` in `app/Program.cs` and `app/Glassify.csproj`.
-2. Build, then zip a `Glassify` folder holding `Glassify.exe`, its DLLs, the `runtimes` folder, `theme.css` and
-   `tools/HOW TO START.txt` (never `data`).
-3. Create a GitHub Release with a higher tag (like `v1.2`) and attach the zip.
+GitHub builds and publishes releases itself (`.github/workflows/release.yml`), so a fix can go out from any
+device, a phone included, without a Windows PC:
+1. Commit the fix to `main`.
+2. Raise the version in **both** `app/Program.cs` (`Version = "1.2"`) and `app/Glassify.csproj`
+   (`<Version>1.2.0</Version>`). Use a higher number than the current release.
+3. Rewrite the top of `.github/release-notes.md` ("New in 1.2") and change the zip name in it.
+4. Commit, push, then push a tag that matches the version: `git tag v1.2` and `git push origin v1.2`.
+
+GitHub then builds Glassify on Windows, refuses to publish if the tag doesn't match the version in both files or
+isn't newer than the current release, packages the zip (`Glassify.exe`, its DLLs, the `runtimes` folder,
+`theme.css` and `tools/HOW TO START.txt`, never `data`), publishes the release and removes the older ones. Follow
+it in the Actions tab. To test a build without publishing anything, run "Build and release" by hand from the
+Actions tab: the zip is attached to the run.
 
 Running copies check a few seconds after starting and every 2 hours, then install it automatically (or, with
 automatic updates off, show an update button at the top right). The update downloads the zip from this
